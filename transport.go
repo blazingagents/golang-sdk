@@ -123,23 +123,19 @@ func (t *transport) prepare(ctx context.Context, r op.Request, params any, opts 
 	if q := query.Encode(); q != "" {
 		u += "?" + q
 	}
-	req, err := http.NewRequest(r.Op.Method, u, nil)
-	if err != nil {
-		return nil, &ArgumentError{Name: "request", Reason: err.Error()}
-	}
 	// An UploadFile is opened here, so a missing file is an *ArgumentError before anything is sent.
 	reqBody, contentType, secrets, err := encodeBody(r.Op, params)
 	if err != nil {
 		return nil, err
 	}
-	if reqBody != nil {
-		req.Body = io.NopCloser(reqBody)
-		if br, ok := reqBody.(*bytes.Reader); ok {
-			req.ContentLength = int64(br.Len())
+	// NewRequest sets GetBody for a JSON body, so net/http can replay it on a stale
+	// connection or after an HTTP/2 GOAWAY.
+	req, err := http.NewRequest(r.Op.Method, u, reqBody)
+	if err != nil {
+		if c, ok := reqBody.(io.Closer); ok {
+			c.Close()
 		}
-		if rc, ok := reqBody.(io.ReadCloser); ok {
-			req.Body = rc
-		}
+		return nil, &ArgumentError{Name: "request", Reason: err.Error()}
 	}
 	timeout := t.timeout
 	if o.timeout != nil {
@@ -199,16 +195,6 @@ func (c *call) send() (*http.Response, error) {
 	if err != nil {
 		return nil, c.connectionError(err)
 	}
-	if c.op.Response.Streaming() {
-		if c.header != nil {
-			c.header.Stop()
-		}
-		if d := c.t.idleTimeout; d > 0 {
-			cancel := c.cancel
-			c.idle = time.AfterFunc(d, func() { cancel(ErrStreamIdle) })
-			resp.Body = &idleReader{ReadCloser: resp.Body, timer: c.idle, d: d}
-		}
-	}
 	c.meta = ResponseMeta{
 		OperationID:     c.op.ID,
 		Status:          resp.StatusCode,
@@ -220,11 +206,22 @@ func (c *call) send() (*http.Response, error) {
 		*c.capture = c.meta
 	}
 	c.observe(time.Since(start))
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		return resp, nil
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		// An error body is an ordinary document, so the timer still bounds it, streaming or not.
+		defer resp.Body.Close()
+		return nil, c.apiError(resp)
 	}
-	defer resp.Body.Close()
-	return nil, c.apiError(resp)
+	if c.op.Response.Streaming() {
+		if c.header != nil {
+			c.header.Stop()
+		}
+		if d := c.t.idleTimeout; d > 0 {
+			cancel := c.cancel
+			c.idle = time.AfterFunc(d, func() { cancel(ErrStreamIdle) })
+			resp.Body = &idleReader{ReadCloser: resp.Body, timer: c.idle, d: d}
+		}
+	}
+	return resp, nil
 }
 
 // connectionError: the SDK's own timeout is the context cause, so it surfaces as
@@ -255,13 +252,20 @@ func (c *call) observe(d time.Duration) {
 		return
 	}
 	defer func() { _ = recover() }()
-	c.t.observer(ResponseObservation{ResponseMeta: c.meta, Method: c.op.Method, Path: path, Duration: d})
+	obs := ResponseObservation{ResponseMeta: c.meta, Method: c.op.Method, Path: path, Duration: d}
+	obs.Header = c.meta.Header.Clone() // the caller's meta and error keep their own map
+	c.t.observer(obs)
 }
 
 const maxErrorBody = 64 << 10
 
-func (c *call) apiError(resp *http.Response) *APIError {
-	data, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrorBody+1))
+// apiError reads a non-2xx response. A body that fails to read makes the call fail as a
+// connection or timeout error: a partial body is not the server's answer.
+func (c *call) apiError(resp *http.Response) error {
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxErrorBody+1))
+	if err != nil {
+		return c.connectionError(err)
+	}
 	e := &APIError{Status: resp.StatusCode, Meta: c.meta, RetryAfter: retryAfter(resp.Header.Get("Retry-After"))}
 	if len(data) > maxErrorBody {
 		data, e.BodyTruncated = data[:maxErrorBody], true

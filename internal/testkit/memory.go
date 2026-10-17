@@ -50,7 +50,9 @@ func (t memoryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		pw.CloseWithError(ctx.Err())
 		return nil, ctx.Err()
 	}
-	stop := context.AfterFunc(ctx, func() { pr.CloseWithError(context.Cause(ctx)) })
+	// A canceled request reads its cause, as a real body does; closing the writer side is what
+	// makes the reader see it.
+	stop := context.AfterFunc(ctx, func() { pw.CloseWithError(context.Cause(ctx)) })
 	return &http.Response{
 		Status: http.StatusText(w.status), StatusCode: w.status, Proto: "HTTP/1.1", ProtoMajor: 1, ProtoMinor: 1,
 		Header: w.sent, Body: &memoryBody{pr, stop}, ContentLength: -1, Request: req,

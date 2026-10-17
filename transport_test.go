@@ -196,3 +196,68 @@ func TestHeaderParams(t *testing.T) {
 		}
 	}
 }
+
+// The error body of a streaming operation is an ordinary document: WithTimeout bounds it.
+func TestStreamingErrorBodyIsBounded(t *testing.T) {
+	id, path := transportAgent()
+	synctest.Test(t, func(t *testing.T) {
+		m := testkit.New(t)
+		c := m.Client(ba.WithTransport(m.Transport()), ba.WithTimeout(time.Second))
+		m.Expect(testkit.Exchange{Op: "generate", Path: path + "/generation", BodyFunc: func([]byte) error { return nil },
+			Status: 500, RespBody: `{"error":{"code":"internal","mess`, Hang: true})
+		_, err := c.Generation.Completion(context.Background(), id, ba.Text("p"), ba.GenerateParams{})
+		if te := (*ba.TimeoutError)(nil); !errors.As(err, &te) || te.OperationID != "generate" {
+			t.Fatalf("error %T %v, want *TimeoutError", err, err)
+		}
+	})
+}
+
+// A read failure of an error body is the failure of the call, not a garbled *APIError.
+func TestErrorBodyReadFailure(t *testing.T) {
+	id, path := transportAgent()
+	synctest.Test(t, func(t *testing.T) {
+		m := testkit.New(t)
+		c := m.Client(ba.WithTransport(m.Transport()), ba.WithTimeout(time.Second))
+		m.Expect(testkit.Exchange{Op: "getAgent", Path: path, Status: 503, RespBody: `{"error":{"code":"service_unavailable","mess`, Hang: true})
+		_, err := c.Agents.Get(context.Background(), id)
+		if !errors.As(err, new(*ba.TimeoutError)) || !errors.Is(err, context.DeadlineExceeded) || errors.As(err, new(*ba.APIError)) {
+			t.Fatalf("timeout: %T %v", err, err)
+		}
+		m.Expect(testkit.Exchange{Op: "getAgent", Path: path, Status: 503, RespBody: `{"error":`, Hang: true})
+		ctx, cancel := context.WithCancel(context.Background())
+		time.AfterFunc(100*time.Millisecond, cancel)
+		_, err = c.Agents.Get(ctx, id)
+		if !errors.As(err, new(*ba.ConnectionError)) || !errors.Is(err, context.Canceled) {
+			t.Fatalf("cancel: %T %v", err, err)
+		}
+	})
+}
+
+type transportGetBodyProbe struct{ replayable []bool }
+
+func (p *transportGetBodyProbe) RoundTrip(r *http.Request) (*http.Response, error) {
+	p.replayable = append(p.replayable, r.GetBody != nil && r.ContentLength > 0)
+	if r.GetBody != nil {
+		b, err := r.GetBody()
+		if err != nil {
+			return nil, err
+		}
+		b.Close()
+	}
+	r.Body.Close()
+	return &http.Response{StatusCode: 200, Header: http.Header{}, Body: http.NoBody, Request: r}, nil
+}
+
+// A JSON body can be replayed, so net/http may retry an idempotent request (forkSession has
+// an Idempotency-Key) on a stale connection or after an HTTP/2 GOAWAY.
+func TestJSONBodyIsReplayable(t *testing.T) {
+	p := &transportGetBodyProbe{}
+	c, err := ba.NewClient(ba.WithAPIKey(testkit.APIKey), ba.WithTransport(p))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Sessions.Fork(context.Background(), "a", "s", ba.ForkSessionParams{MessageID: "m", IdempotencyKey: "k"})
+	if len(p.replayable) != 1 || !p.replayable[0] {
+		t.Fatalf("replayable %v", p.replayable)
+	}
+}

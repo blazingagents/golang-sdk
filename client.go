@@ -328,7 +328,9 @@ func newUserClient(t *transport) *UserClient {
 	}
 }
 
-var userIDPattern = regexp.MustCompile(`^[\x21-\x7E](?:[\x20-\x7E]*[\x21-\x7E])?$`)
+// printablePattern is printable ASCII with no leading or trailing space: a header value net/http
+// sends unchanged, so a user ID or client request ID is reported exactly as it went on the wire.
+var printablePattern = regexp.MustCompile(`^[\x21-\x7E](?:[\x20-\x7E]*[\x21-\x7E])?$`)
 
 // ForUser returns a client that acts for userID: 1 to 256 printable ASCII characters with
 // no leading or trailing space. It shares the connection pool.
@@ -336,7 +338,7 @@ func (c *Client) ForUser(userID string) (*UserClient, error) {
 	switch {
 	case len(userID) > 256:
 		return nil, fmt.Errorf("%w: longer than 256 characters", ErrInvalidUserID)
-	case !userIDPattern.MatchString(userID):
+	case !printablePattern.MatchString(userID):
 		return nil, fmt.Errorf("%w: must be printable ASCII with no leading or trailing space", ErrInvalidUserID)
 	}
 	t := *c.t
@@ -344,8 +346,14 @@ func (c *Client) ForUser(userID string) (*UserClient, error) {
 	return newUserClient(&t), nil
 }
 
+const requestIDRule = "must be printable ASCII with no leading or trailing space"
+
+// validRequestID reports whether id is "" or a value that goes on the wire unchanged.
+func validRequestID(id string) bool { return id == "" || printablePattern.MatchString(id) }
+
 // WithClientRequestID returns a copy that sends X-Client-Request-Id on every request.
-// "" clears it. The copy shares the connection pool.
+// "" clears it. The copy shares the connection pool. The ID must be printable ASCII with no
+// leading or trailing space.
 func (c *Client) WithClientRequestID(id string) (*Client, error) {
 	t, err := c.t.withClientRequestID(id)
 	if err != nil {
@@ -365,8 +373,8 @@ func (u *UserClient) WithClientRequestID(id string) (*UserClient, error) {
 }
 
 func (t *transport) withClientRequestID(id string) (*transport, error) {
-	if !validHeaderValue(id) {
-		return nil, fmt.Errorf("%w X-Client-Request-Id: not a valid header value", ErrInvalidHeader)
+	if !validRequestID(id) {
+		return nil, fmt.Errorf("%w X-Client-Request-Id: %s", ErrInvalidHeader, requestIDRule)
 	}
 	c := *t
 	c.clientRequestID = id

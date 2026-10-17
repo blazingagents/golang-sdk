@@ -156,3 +156,44 @@ func TestObserverAndLogger(t *testing.T) {
 		t.Fatalf("nil logger: %v", err)
 	}
 }
+
+// A client request ID must reach the wire exactly as reported: net/http trims surrounding
+// whitespace when it writes a header, so such values are rejected up front.
+func TestClientRequestIDOnTheWire(t *testing.T) {
+	m := testkit.New(t)
+	c := m.Client()
+	id := ba.AgentID(testkit.ID(op.IDPatterns["AgentID"]))
+	for _, crid := range []string{" req-1", "req-1\t", "  ", "a\x7f", "é"} {
+		if _, err := c.WithClientRequestID(crid); !errors.Is(err, ba.ErrInvalidHeader) {
+			t.Errorf("client %q: %v, want ErrInvalidHeader", crid, err)
+		}
+		_, err := c.Agents.Get(context.Background(), id, ba.WithClientRequestID(crid))
+		if ae := (*ba.ArgumentError)(nil); !errors.As(err, &ae) || !errors.Is(err, ba.ErrInvalidHeader) {
+			t.Errorf("per call %q: %v, want *ArgumentError wrapping ErrInvalidHeader", crid, err)
+		}
+	}
+	tagged, err := c.WithClientRequestID("job 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.Expect(testkit.Exchange{Op: "getAgent", Path: "/v1/agents/" + string(id), Header: http.Header{"X-Client-Request-Id": {"job 1"}}, RespBody: testkit.Example("getAgent", 200)})
+	var meta ba.ResponseMeta
+	if _, err := tagged.Agents.Get(context.Background(), id, ba.CaptureResponse(&meta)); err != nil || meta.ClientRequestID != "job 1" {
+		t.Fatalf("reported %q, %v", meta.ClientRequestID, err)
+	}
+}
+
+// The observer gets its own copy of the response headers.
+func TestObserverCannotEditTheCallersHeaders(t *testing.T) {
+	m := testkit.New(t)
+	c := m.Client(ba.WithObserver(func(o ba.ResponseObservation) { o.Header.Del("X-Request-Id") }))
+	id := ba.AgentID(testkit.ID(op.IDPatterns["AgentID"]))
+	m.Expect(testkit.Exchange{Op: "getAgent", Path: "/v1/agents/" + string(id), Status: 404, RespHeader: http.Header{"X-Request-Id": {"req_1"}},
+		RespBody: `{"error":{"code":"not_found","message":"no"}}`})
+	var meta ba.ResponseMeta
+	_, err := c.Agents.Get(context.Background(), id, ba.CaptureResponse(&meta))
+	var ae *ba.APIError
+	if !errors.As(err, &ae) || ae.Meta.Header.Get("X-Request-Id") != "req_1" || meta.Header.Get("X-Request-Id") != "req_1" {
+		t.Fatalf("error %v; captured %v", err, meta.Header)
+	}
+}

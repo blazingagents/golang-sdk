@@ -38,11 +38,12 @@ func WithRequestHeader(name, value string) RequestOption {
 }
 
 // WithClientRequestID sends X-Client-Request-Id with this call, over the client's value.
-// "" keeps the client's value.
+// "" keeps the client's value. The ID must be printable ASCII with no leading or trailing space,
+// so ResponseMeta.ClientRequestID is exactly what was sent.
 func WithClientRequestID(id string) RequestOption {
 	return func(o *callOptions) {
-		if !validHeaderValue(id) {
-			o.fail(&ArgumentError{Name: "clientRequestID", Reason: "not a valid header value", Err: ErrInvalidHeader})
+		if !validRequestID(id) {
+			o.fail(&ArgumentError{Name: "clientRequestID", Reason: requestIDRule, Err: ErrInvalidHeader})
 			return
 		}
 		o.clientRequestID = id
