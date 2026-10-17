@@ -36,7 +36,7 @@ type Operation struct {
 	Query          []string // query parameter names; the encoder sends only these
 	Body           BodyKind
 	Response       ResponseKind
-	UserScoped     bool // in spec/scope.json userScoped
+	UserScoped     bool // x-scope "end-user"
 	CredentialSafe bool // tag providers, mcp-connections or chat-connections, or path exactly /v1/merchant-connection
 }
 

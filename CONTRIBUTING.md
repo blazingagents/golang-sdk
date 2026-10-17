@@ -6,7 +6,7 @@
 | --- | --- |
 | `go run ./internal/cmd/gate` | The one test command, locally and in CI. Runs every check below in order and stops at the first failure |
 | `go run ./internal/cmd/specgen` | Regenerates `internal/op/op.go`, `errorcode.go` and `enums.go` |
-| `go run ./internal/cmd/specgen -check` | Fails when a generated file is stale, or the spec has an operation outside `spec/scope.json`, a response `oneOf` outside the union-name table, an ID prefix outside the ID-type table, or a string enum outside the enum-name table |
+| `go run ./internal/cmd/specgen -check` | Fails when a generated file is stale, or the spec has an operation without an `x-scope` of `end-user` or `tenant`, a response `oneOf` outside the union-name table, an ID prefix outside the ID-type table, or a string enum outside the enum-name table |
 | `go run ./internal/cmd/specgen -drift ../ba-platform/servers/api/openapi.json` | Shows how the platform spec differs from `spec/openapi.json` |
 | `go run ./internal/cmd/specgen -sync ../ba-platform/servers/api/openapi.json` | Copies the platform spec in and regenerates |
 
@@ -34,7 +34,7 @@ There is one package at the module root, `blazingagents`, imported as `ba`. The 
 
 - The core is `client.go`, `options.go`, `transport.go`, `query.go`, `errors.go`, `ids.go`, `nullable.go`, `secret.go`, `date.go`, `page.go`, `union.go`, `unions.go`, `sse.go`, `upload.go`, `download.go`, `messages.go`, `shared.go`, `chat.go`, `generation.go`, `schema.go`, `functions.go` and `runner.go`.
 - `internal/op/op.go`, `errorcode.go` and `enums.go` are generated. Never edit them by hand.
-- `spec/openapi.json` is the vendored platform spec. `spec/scope.json` says which operations an end user may call, which decides whether a service is on `UserClient`.
+- `spec/openapi.json` is the vendored platform spec. Each operation's `x-scope` says whether an end user may call it (`end-user`) or it needs Tenant authority (`tenant`), which decides whether a service is on `UserClient`. The server enforces the same field.
 - `internal/cmd/specgen` is the generator, `internal/cmd/gate` is the gate, and `internal/testkit` is the test support: the mock server, spec examples and the shared checks.
 - `examples/` holds runnable `main` packages. They use only the public API and the standard library.
 
@@ -42,7 +42,7 @@ Only the generated code, the generator, the gate, the test kit and the examples 
 
 ## The generator
 
-`specgen` reads `spec/openapi.json` and `spec/scope.json` and writes:
+`specgen` reads `spec/openapi.json` and writes:
 
 - `internal/op/op.go`: one `Operation` per spec operation with its method, path, parameters, body and response kind, the scoped request constructors, `op.All`, the request fields `params_test.go` checks, `op.IDPatterns` and the union sites.
 - `errorcode.go`: one `ErrorCode` constant per declared error code.
