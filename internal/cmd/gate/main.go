@@ -32,7 +32,12 @@ const (
 )
 
 // packages is the module's complete package list; a new package would escape the coverage gate.
-var packages = []string{module, module + "/internal/cmd/gate", module + "/internal/cmd/specgen", module + "/internal/op", module + "/internal/testkit"}
+// The examples are main packages, which the root cannot import; go vet, staticcheck and the
+// cross builds cover them.
+var packages = []string{
+	module, module + "/examples/chat_relay", module + "/examples/quickstart", module + "/examples/structured_output",
+	module + "/internal/cmd/gate", module + "/internal/cmd/specgen", module + "/internal/op", module + "/internal/testkit",
+}
 
 func main() {
 	tmp, err := os.MkdirTemp("", "gate-")
