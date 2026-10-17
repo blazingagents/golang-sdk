@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 (unreleased)
+## 0.1.0 (2026-10-17)
 
 - Initial release.
 - `Client` and `UserClient` scopes: `client.ForUser(userID)` sends the end
