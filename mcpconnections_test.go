@@ -169,7 +169,7 @@ func TestMCPConnectionsSmoke(t *testing.T) {
 			Exchanges: []testkit.Exchange{{Op: "testMcpConnection", Path: path + "/test", RespBody: `{"ok":false,"error":{"code":"MCP_CONNECTION_UNREACHABLE","message":"down"}}`}},
 			Example:   `{"ok":false,"error":{"code":"MCP_CONNECTION_UNREACHABLE","message":"down"}}`,
 			Check: func(t *testing.T, got any) {
-				if r := got.(*ba.MCPConnectionTest); r.OK || r.Error == nil || r.Error.Code != ba.MCPConnectionErrorCodeMCPConnectionUnreachable || r.Error.Message != "down" ||
+				if r := got.(*ba.MCPConnectionTest); r.OK || r.Error == nil || r.Error.Code != ba.MCPConnectionErrorCodeUnreachable || r.Error.Message != "down" ||
 					r.Server != nil || r.ToolNames != nil || r.Latency != 0 || r.ToolCount != 0 {
 					t.Fatalf("decoded %+v", r)
 				}
