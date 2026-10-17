@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"go/build/constraint"
 	"go/parser"
 	"go/token"
 	"io/fs"
@@ -142,7 +143,52 @@ func checkLayout() error {
 			return fmt.Errorf("the root package imports %s; only the standard library and internal/op are allowed", imp)
 		}
 	}
-	return nil
+	return checkUnconstrained()
+}
+
+// checkUnconstrained rejects a build constraint or a GOOS/GOARCH file-name suffix on any
+// non-test file of the root package: coverage is measured in one build (linux, -race), so a
+// file excluded from it would ship unmeasured.
+func checkUnconstrained() error {
+	dist, err := output("go", "tool", "dist", "list")
+	if err != nil {
+		return err
+	}
+	known := map[string]bool{}
+	for _, target := range strings.Fields(dist) {
+		goos, goarch, _ := strings.Cut(target, "/")
+		known[goos], known[goarch] = true, true
+	}
+	files, err := filepath.Glob("*.go")
+	if err != nil {
+		return err
+	}
+	var problems []string
+	fset := token.NewFileSet()
+	for _, name := range files {
+		if strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		parts := strings.Split(strings.TrimSuffix(name, ".go"), "_")
+		if len(parts) > 1 && known[parts[len(parts)-1]] {
+			problems = append(problems, name+": a GOOS or GOARCH file-name suffix")
+		}
+		f, err := parser.ParseFile(fset, name, nil, parser.PackageClauseOnly|parser.ParseComments)
+		if err != nil {
+			return err
+		}
+		for _, group := range f.Comments {
+			if group.Pos() > f.Package {
+				break
+			}
+			for _, c := range group.List {
+				if constraint.IsGoBuild(c.Text) || constraint.IsPlusBuild(c.Text) {
+					problems = append(problems, name+": a build constraint "+c.Text)
+				}
+			}
+		}
+	}
+	return joinProblems(problems)
 }
 
 // allowedTestImports are the module packages a test may import.
