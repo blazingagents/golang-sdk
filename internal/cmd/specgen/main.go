@@ -761,6 +761,10 @@ func (g *gen) union(branches []any) (*union, error) {
 	return u, nil
 }
 
+// turnStreamErrorEventRef is not walked: stream chunks are untyped in v1, and its code enum
+// grows with every API error code.
+const turnStreamErrorEventRef = "#/components/schemas/TurnStreamErrorEvent"
+
 var idPattern = regexp.MustCompile(`^\^([a-z]+)_\[0-9A-Za-z\]\{16\}\$$`)
 
 func (g *gen) collectPatterns(x any, depth int) {
@@ -770,7 +774,9 @@ func (g *gen) collectPatterns(x any, depth int) {
 	switch x := x.(type) {
 	case schema:
 		if ref, ok := x["$ref"].(string); ok {
-			g.collectPatterns(g.s.resolve(schema{"$ref": ref}), depth+1)
+			if ref != turnStreamErrorEventRef {
+				g.collectPatterns(g.s.resolve(schema{"$ref": ref}), depth+1)
+			}
 			return
 		}
 		g.collectEnum(arr(x["enum"]))
