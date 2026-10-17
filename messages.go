@@ -195,22 +195,26 @@ type Message struct {
 // messageFields is Message without its JSON methods.
 type messageFields Message
 
+// UnmarshalJSON reads each field by its exact key, as UserMessage does: encoding/json would
+// also match "ID" or "Role", which an end user's message can carry as unknown fields.
 func (m *Message) UnmarshalJSON(b []byte) error {
 	var obj map[string]json.RawMessage
 	if err := json.Unmarshal(b, &obj); err != nil {
 		return err
 	}
-	var f messageFields
-	if err := json.Unmarshal(b, &f); err != nil {
-		return err
-	}
-	for _, k := range []string{"id", "role", "branchable", "parts", "metadata"} {
-		delete(obj, k)
+	var out Message
+	for k, dst := range map[string]any{"id": &out.ID, "role": &out.Role, "branchable": &out.Branchable, "parts": &out.Parts, "metadata": &out.Metadata} {
+		if raw, ok := obj[k]; ok {
+			if err := json.Unmarshal(raw, dst); err != nil {
+				return err
+			}
+			delete(obj, k)
+		}
 	}
 	if len(obj) > 0 {
-		f.extra = obj
+		out.extra = obj
 	}
-	*m = Message(f)
+	*m = out
 	return nil
 }
 

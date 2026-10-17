@@ -385,7 +385,9 @@ func TestUserMessageJSON(t *testing.T) {
 
 func TestMessageJSON(t *testing.T) {
 	ids := newChatIDs()
-	raw := `{"id":"m1","role":"assistant","branchable":true,"parts":[{"type":"text","text":"hi"}],"metadata":{"a":1},"createdAt":"2026-01-02T03:04:05Z","annotations":[{"n":1}],"note":null}`
+	// Unknown keys that differ from known ones only in case stay unknown: an end user's
+	// message can carry any top-level key, and must not replace the id or the role.
+	raw := `{"id":"m1","role":"assistant","branchable":true,"parts":[{"type":"text","text":"hi"}],"metadata":{"a":1},"createdAt":"2026-01-02T03:04:05Z","annotations":[{"n":1}],"note":null,"ID":"m9","Role":"system","Parts":[],"Metadata":{"b":2}}`
 	testkit.Run(t, []testkit.Case{{
 		Name:      "unknown top-level fields survive",
 		Exchanges: []testkit.Exchange{{Op: "listSessionMessages", RespBody: `{"data":[` + raw + `],"nextCursor":null,"latestCursor":null}`}},
