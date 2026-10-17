@@ -638,7 +638,9 @@ func MatchesExample(t testing.TB, example string, got any) {
 }
 
 func differences(have, want any, path string) []string {
-	if want == nil && zeroJSON(have) {
+	// An explicit null matches a zero scalar or an empty object, but not an object of zero
+	// values: that is a struct value where the API sends null.
+	if obj, isObj := have.(map[string]any); want == nil && zeroJSON(have) && (!isObj || len(obj) == 0) {
 		return nil
 	}
 	switch h := have.(type) {

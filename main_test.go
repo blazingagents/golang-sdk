@@ -34,3 +34,25 @@ func TestMatchesExampleZeroObject(t *testing.T) {
 		Health health `json:"health"`
 	}{ID: "c1"})
 }
+
+// An example's explicit null still fails against an object: a nullable object modeled as a
+// struct value is a defect the example must catch.
+func TestMatchesExampleNullObject(t *testing.T) {
+	type health struct {
+		OK bool `json:"ok"`
+	}
+	r := &failRecorder{TB: t}
+	testkit.MatchesExample(r, `{"health":null}`, struct {
+		Health health `json:"health"`
+	}{})
+	if !r.failed {
+		t.Fatal("null matched an object of zero values")
+	}
+}
+
+type failRecorder struct {
+	testing.TB
+	failed bool
+}
+
+func (r *failRecorder) Errorf(string, ...any) { r.failed = true }
