@@ -13,6 +13,11 @@ func TestMain(m *testing.M) { os.Exit(testkit.Main(m)) }
 
 func jsonUnmarshalString(s string, v any) error { return json.Unmarshal([]byte(s), v) }
 
+func jsonEqualString(a, b string) bool {
+	var x, y any
+	return json.Unmarshal([]byte(a), &x) == nil && json.Unmarshal([]byte(b), &y) == nil && jsonString(x) == jsonString(y)
+}
+
 func jsonString(v any) string {
 	data, err := json.Marshal(v)
 	if err != nil {

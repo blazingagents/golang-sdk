@@ -138,11 +138,6 @@ func runnerDrain(s *ba.ChatStream) ([]string, error) {
 	return out, nil
 }
 
-func jsonEqualString(a, b string) bool {
-	var x, y any
-	return json.Unmarshal([]byte(a), &x) == nil && json.Unmarshal([]byte(b), &y) == nil && jsonString(x) == jsonString(y)
-}
-
 type runnerOrder struct {
 	OrderID string `json:"orderId"`
 }

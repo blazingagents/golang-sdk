@@ -56,7 +56,7 @@ func secretParse(t *testing.T) *secretGraph {
 					}
 					switch typ := ts.Type.(type) {
 					case *ast.StructType:
-						g.fields[ts.Name.Name] = exportedFields(typ)
+						g.fields[ts.Name.Name] = secretExportedFields(typ)
 					case *ast.InterfaceType:
 						if len(typ.Methods.List) == 1 && len(typ.Methods.List[0].Names) == 1 {
 							if m := typ.Methods.List[0].Names[0].Name; strings.HasPrefix(m, "is") {
@@ -91,9 +91,9 @@ func secretParse(t *testing.T) *secretGraph {
 	return g
 }
 
-// exportedFields are a struct's exported field types: fmt and slog never call Format through
+// secretExportedFields are a struct's exported field types: fmt and slog never call Format through
 // an unexported field, so a Secret matters only where exported fields lead.
-func exportedFields(st *ast.StructType) []ast.Expr {
+func secretExportedFields(st *ast.StructType) []ast.Expr {
 	var out []ast.Expr
 	for _, fl := range st.Fields.List {
 		if len(fl.Names) == 0 || fl.Names[0].IsExported() {
@@ -142,7 +142,7 @@ func (g *secretGraph) exprHolds(e ast.Expr) bool {
 	case *ast.IndexListExpr:
 		return slices.ContainsFunc(e.Indices, g.exprHolds)
 	case *ast.StructType:
-		return slices.ContainsFunc(exportedFields(e), g.exprHolds)
+		return slices.ContainsFunc(secretExportedFields(e), g.exprHolds)
 	}
 	return false
 }

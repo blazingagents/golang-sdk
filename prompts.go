@@ -58,7 +58,7 @@ func (s *PromptsService) List(ctx context.Context, params ListPromptsParams, opt
 // All iterates saved prompts across pages, starting at params.Cursor: listPrompts.
 // See https://docs.blazingagents.com/api-reference/rest-api/prompts#list-prompts.
 func (s *PromptsService) All(ctx context.Context, params ListPromptsParams, opts ...RequestOption) iter.Seq2[Prompt, error] {
-	return all(ctx, "", func(ctx context.Context, cursor string) (*Page[Prompt], error) {
+	return all(ctx, func(ctx context.Context, cursor string) (*Page[Prompt], error) {
 		p := params
 		if cursor != "" {
 			p.Cursor = &cursor

@@ -190,7 +190,7 @@ func (s *SessionsService) List(ctx context.Context, agentID AgentID, params List
 // All iterates an agent's sessions across pages, starting at params.Cursor: listSessions.
 // See https://docs.blazingagents.com/api-reference/rest-api/sessions#list-sessions.
 func (s *SessionsService) All(ctx context.Context, agentID AgentID, params ListSessionsParams, opts ...RequestOption) iter.Seq2[SessionSummary, error] {
-	return all(ctx, "", func(ctx context.Context, cursor string) (*Page[SessionSummary], error) {
+	return all(ctx, func(ctx context.Context, cursor string) (*Page[SessionSummary], error) {
 		p := params
 		if cursor != "" {
 			p.Cursor = &cursor
@@ -208,7 +208,7 @@ func (s *SessionsService) ListLatest(ctx context.Context, params ListLatestSessi
 // AllLatest iterates the latest sessions across pages, starting at params.Cursor: listLatestSessions.
 // See https://docs.blazingagents.com/api-reference/rest-api/sessions#list-latest-sessions.
 func (s *SessionsService) AllLatest(ctx context.Context, params ListLatestSessionsParams, opts ...RequestOption) iter.Seq2[LatestSession, error] {
-	return all(ctx, "", func(ctx context.Context, cursor string) (*Page[LatestSession], error) {
+	return all(ctx, func(ctx context.Context, cursor string) (*Page[LatestSession], error) {
 		p := params
 		if cursor != "" {
 			p.Cursor = &cursor
@@ -248,7 +248,7 @@ func (s *SessionsService) ListMessages(ctx context.Context, agentID AgentID, ses
 // *ArgumentError and sends nothing: listSessionMessages.
 // See https://docs.blazingagents.com/api-reference/rest-api/sessions#list-session-messages.
 func (s *SessionsService) AllMessages(ctx context.Context, agentID AgentID, sessionID SessionID, params ListSessionMessagesParams, opts ...RequestOption) iter.Seq2[Message, error] {
-	return all(ctx, "", func(ctx context.Context, cursor string) (*SessionMessageList, error) {
+	return all(ctx, func(ctx context.Context, cursor string) (*SessionMessageList, error) {
 		p := params
 		switch {
 		case cursor == "":
@@ -290,7 +290,7 @@ func (s *SessionsService) ListInputs(ctx context.Context, agentID AgentID, sessi
 // listSessionInputs.
 // See https://docs.blazingagents.com/api-reference/rest-api/sessions#list-session-inputs.
 func (s *SessionsService) AllInputs(ctx context.Context, agentID AgentID, sessionID SessionID, params ListSessionInputsParams, opts ...RequestOption) iter.Seq2[SessionInput, error] {
-	return all(ctx, "", func(ctx context.Context, cursor string) (*SessionInputList, error) {
+	return all(ctx, func(ctx context.Context, cursor string) (*SessionInputList, error) {
 		p := params
 		if cursor != "" {
 			p.Cursor = &cursor

@@ -102,7 +102,7 @@ func (s *SkillsService) List(ctx context.Context, agentID AgentID, params ListSk
 // needed (listSkills).
 // See https://docs.blazingagents.com/api-reference/rest-api/skills#list-skills.
 func (s *SkillsService) All(ctx context.Context, agentID AgentID, params ListSkillsParams, opts ...RequestOption) iter.Seq2[SkillSummary, error] {
-	return all(ctx, "", func(ctx context.Context, cursor string) (*Page[SkillSummary], error) {
+	return all(ctx, func(ctx context.Context, cursor string) (*Page[SkillSummary], error) {
 		p := params
 		if cursor != "" {
 			p.Cursor = &cursor
@@ -131,7 +131,7 @@ func (s *SkillsService) ReadFile(ctx context.Context, agentID AgentID, skillID S
 	if err != nil {
 		return nil, err
 	}
-	return newDownload(resp, c), nil
+	return &Download{streamBody{c: c, resp: resp}}, nil
 }
 
 // ReplaceFile creates or replaces one file of a skill with what content yields, sent as

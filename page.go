@@ -22,10 +22,10 @@ type pager[T any] interface {
 
 // all yields every item across pages. Nothing is sent until the first iteration. A fetch
 // error is yielded once and ends the iteration; breaking out stops fetching. Ranging the
-// sequence again starts over from cursor.
-func all[T any, P pager[T]](ctx context.Context, cursor string, fetch func(context.Context, string) (P, error)) iter.Seq2[T, error] {
+// sequence again starts over.
+func all[T any, P pager[T]](ctx context.Context, fetch func(context.Context, string) (P, error)) iter.Seq2[T, error] {
 	return func(yield func(T, error) bool) {
-		c := cursor
+		var c string
 		for {
 			page, err := fetch(ctx, c)
 			if err != nil {

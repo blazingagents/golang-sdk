@@ -235,7 +235,7 @@ func (s *MerchantBindingsService) List(ctx context.Context, params ListMerchantB
 // (listMerchantBindings).
 // See https://docs.blazingagents.com/api-reference/rest-api/merchant#list-merchant-bindings.
 func (s *MerchantBindingsService) All(ctx context.Context, params ListMerchantBindingsParams, opts ...RequestOption) iter.Seq2[MerchantBinding, error] {
-	return all(ctx, "", func(ctx context.Context, cursor string) (*MerchantBindingList, error) {
+	return all(ctx, func(ctx context.Context, cursor string) (*MerchantBindingList, error) {
 		p := params
 		if cursor != "" {
 			p.Cursor = &cursor
@@ -267,7 +267,7 @@ func (s *MerchantUsageEventsService) List(ctx context.Context, params ListMercha
 // (listMerchantUsageEvents).
 // See https://docs.blazingagents.com/api-reference/rest-api/merchant#list-merchant-usage-events.
 func (s *MerchantUsageEventsService) All(ctx context.Context, params ListMerchantUsageEventsParams, opts ...RequestOption) iter.Seq2[MerchantUsageEvent, error] {
-	return all(ctx, "", func(ctx context.Context, cursor string) (*MerchantUsageEventList, error) {
+	return all(ctx, func(ctx context.Context, cursor string) (*MerchantUsageEventList, error) {
 		p := params
 		if cursor != "" {
 			p.Cursor = &cursor

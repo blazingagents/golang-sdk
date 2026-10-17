@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
-	"sync"
 
 	"github.com/blazingagents/golang-sdk/internal/op"
 )
@@ -77,8 +76,10 @@ type continueBody struct {
 
 var errNilInput = &ArgumentError{Name: "input", Reason: "nil"}
 
-// Send starts a turn: on a new session when params.SessionID is "", else on that session.
-// The handshake completes before Send returns. Always defer stream.Close().
+// Send starts a turn: on a new session when params.SessionID is "" (createSessionTurn), else
+// on that session (resumeSessionTurn). The handshake completes before Send returns. Always
+// defer stream.Close().
+// See https://docs.blazingagents.com/api-reference/rest-api/sessions#create-session-turn.
 func (s *ChatService) Send(ctx context.Context, agentID AgentID, input ChatInput, params ChatParams, opts ...RequestOption) (*ChatStream, error) {
 	b := turnBody{Trigger: "submit-message", UserID: params.UserID, Metadata: params.Metadata, Functions: params.Functions.defs()}
 	switch in := input.(type) {
@@ -98,7 +99,8 @@ func (s *ChatService) Send(ctx context.Context, agentID AgentID, input ChatInput
 }
 
 // Regenerate replaces the last assistant reply of a session, or the reply after
-// params.MessageID.
+// params.MessageID (resumeSessionTurn).
+// See https://docs.blazingagents.com/api-reference/rest-api/sessions#resume-session-turn.
 func (s *ChatService) Regenerate(ctx context.Context, agentID AgentID, sessionID SessionID, input RegenerateInput, params RegenerateParams, opts ...RequestOption) (*ChatStream, error) {
 	b := turnBody{Trigger: "regenerate-message", MessageID: params.MessageID, UserID: params.UserID, Metadata: params.Metadata, Functions: params.Functions.defs()}
 	switch in := input.(type) {
@@ -114,7 +116,8 @@ func (s *ChatService) Regenerate(ctx context.Context, agentID AgentID, sessionID
 	return s.start(ctx, op.ResumeSessionTurn(string(agentID), string(sessionID)), agentID, sessionID, b, params.Functions, opts)
 }
 
-// Continue resumes a turn that waits for tool approvals.
+// Continue resumes a turn that waits for tool approvals (continueToolApprovals).
+// See https://docs.blazingagents.com/api-reference/rest-api/sessions#continue-tool-approvals.
 func (s *ChatService) Continue(ctx context.Context, agentID AgentID, sessionID SessionID, decisions []ToolApprovalDecision, params ContinueParams, opts ...RequestOption) (*ChatStream, error) {
 	if len(decisions) == 0 {
 		return nil, &ArgumentError{Name: "decisions", Reason: "empty"}
@@ -159,35 +162,30 @@ func (s *ChatService) start(ctx context.Context, r op.UserScoped, agentID AgentI
 		}
 		sessionID = SessionID(id)
 	}
-	cs := &chatStream{c: c, resp: resp, frames: &frames{r: resp.Body}, sessionID: sessionID, turnID: TurnID(turnID)}
+	cs := &ChatStream{streamBody: streamBody{c: c, resp: resp}, frames: &frames{r: resp.Body}, sessionID: sessionID, turnID: TurnID(turnID)}
 	if fns != nil {
 		cs.runner = newRunner(c, agentID, sessionID, fns.f)
 	}
-	return &ChatStream{cs}, nil
+	return cs, nil
 }
 
 // ChatStream is a chat turn's event stream, relayed as the UI message stream useChat reads.
-type ChatStream struct{ s *chatStream }
-
-type chatStream struct {
-	c         *call
-	resp      *http.Response
+type ChatStream struct {
+	streamBody
 	frames    *frames
 	sessionID SessionID
 	turnID    TurnID
 	runner    *runner
-	mu        sync.Mutex
-	closed    bool
 }
 
 // SessionID is the turn's session, new or resumed.
-func (s *ChatStream) SessionID() SessionID { return s.s.sessionID }
+func (s *ChatStream) SessionID() SessionID { return s.sessionID }
 
 // TurnID is the turn's ID, from X-BA-Turn-Id.
-func (s *ChatStream) TurnID() TurnID { return s.s.turnID }
+func (s *ChatStream) TurnID() TurnID { return s.turnID }
 
 // Meta describes the response.
-func (s *ChatStream) Meta() ResponseMeta { return s.s.c.meta }
+func (s *ChatStream) Meta() ResponseMeta { return s.c.meta }
 
 // Events yields one complete event per iteration, a fresh slice each time, with its
 // delimiter. An error is yielded once and ends the iteration. Breaking out leaves the
@@ -195,7 +193,7 @@ func (s *ChatStream) Meta() ResponseMeta { return s.s.c.meta }
 func (s *ChatStream) Events() iter.Seq2[[]byte, error] {
 	return func(yield func([]byte, error) bool) {
 		for {
-			ev, err := s.s.next()
+			ev, err := s.next()
 			if err == io.EOF {
 				return
 			}
@@ -248,25 +246,16 @@ func (s *ChatStream) SetRelayHeaders(h http.Header) {
 	h.Set("Content-Type", "text/event-stream")
 	h.Set("Cache-Control", "no-cache")
 	h.Set("X-Vercel-AI-UI-Message-Stream", "v1")
-	h.Set("X-BA-Turn-Id", string(s.s.turnID))
+	h.Set("X-BA-Turn-Id", string(s.turnID))
 }
 
 // Close ends the connection and cancels every running function handler's context. It does
 // not wait for handlers. It is safe from any goroutine, concurrently with Events, more than once.
 func (s *ChatStream) Close() error {
-	s.s.mu.Lock()
-	defer s.s.mu.Unlock()
-	if s.s.closed {
-		return nil
-	}
-	s.s.closed = true
-	s.s.c.cancel(ErrStreamClosed)
-	err := s.s.resp.Body.Close()
-	s.s.c.done()
-	return err
+	return s.close()
 }
 
-func (s *chatStream) next() ([]byte, error) {
+func (s *ChatStream) next() ([]byte, error) {
 	for {
 		if err := s.runner.failure(); err != nil {
 			return nil, err

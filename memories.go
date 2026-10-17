@@ -51,7 +51,7 @@ func (s *MemoriesService) List(ctx context.Context, agentID AgentID, params List
 // All iterates an agent's memories across pages, starting at params.Cursor: listMemories.
 // See https://docs.blazingagents.com/api-reference/rest-api/memories#list-memories.
 func (s *MemoriesService) All(ctx context.Context, agentID AgentID, params ListMemoriesParams, opts ...RequestOption) iter.Seq2[Memory, error] {
-	return all(ctx, "", func(ctx context.Context, cursor string) (*Page[Memory], error) {
+	return all(ctx, func(ctx context.Context, cursor string) (*Page[Memory], error) {
 		p := params
 		if cursor != "" {
 			p.Cursor = &cursor
