@@ -30,8 +30,8 @@ type Agent struct {
 	Metadata                Metadata          `json:"metadata"`
 	MCPConnectionIDs        []MCPConnectionID `json:"mcpConnectionIds"`
 	AvatarURL               *string           `json:"avatarUrl"` // short-lived signed URL; nil without an avatar
-	CreatedAt               time.Time         `json:"createdAt,omitzero"`
-	UpdatedAt               time.Time         `json:"updatedAt,omitzero"`
+	CreatedAt               time.Time         `json:"createdAt"`
+	UpdatedAt               time.Time         `json:"updatedAt"`
 	Status                  AgentStatus       `json:"status"`
 }
 
@@ -40,8 +40,8 @@ type MCPAttachment struct {
 	MCPConnectionID       MCPConnectionID `json:"mcpConnectionId"`
 	ForwardUserID         bool            `json:"forwardUserId"`
 	ForwardedMetadataKeys []string        `json:"forwardedMetadataKeys"`
-	CreatedAt             time.Time       `json:"createdAt,omitzero"`
-	UpdatedAt             time.Time       `json:"updatedAt,omitzero"`
+	CreatedAt             time.Time       `json:"createdAt"`
+	UpdatedAt             time.Time       `json:"updatedAt"`
 }
 
 // ListAgentsParams filters listAgents.

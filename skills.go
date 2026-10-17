@@ -18,8 +18,8 @@ type Skill struct {
 	Name        string            `json:"name"`
 	Description string            `json:"description"`
 	Metadata    map[string]string `json:"metadata,omitzero"` // from the SKILL.md frontmatter
-	CreatedAt   time.Time         `json:"createdAt,omitzero"`
-	UpdatedAt   time.Time         `json:"updatedAt,omitzero"`
+	CreatedAt   time.Time         `json:"createdAt"`
+	UpdatedAt   time.Time         `json:"updatedAt"`
 	Files       []SkillFile       `json:"files"`
 }
 
@@ -37,8 +37,8 @@ type SkillSummary struct {
 	Name        string            `json:"name"`
 	Description string            `json:"description"`
 	Metadata    map[string]string `json:"metadata,omitzero"`
-	CreatedAt   time.Time         `json:"createdAt,omitzero"`
-	UpdatedAt   time.Time         `json:"updatedAt,omitzero"`
+	CreatedAt   time.Time         `json:"createdAt"`
+	UpdatedAt   time.Time         `json:"updatedAt"`
 }
 
 // SkillCopyError is why copying a skill to one agent failed.
