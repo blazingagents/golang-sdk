@@ -686,12 +686,15 @@ func sameInstant(a, b string) bool {
 	return errA == nil && errB == nil && x.Equal(y)
 }
 
+// zeroTime is how a required time.Time field that the example omits marshals.
+var zeroTime = time.Time{}.Format(time.RFC3339Nano)
+
 func zeroJSON(v any) bool {
 	switch v := v.(type) {
 	case nil:
 		return true
 	case string:
-		return v == ""
+		return v == "" || v == zeroTime
 	case bool:
 		return !v
 	case json.Number:
