@@ -201,11 +201,11 @@ func TestWorkspacesNetworkPolicy(t *testing.T) {
 			Call: func(ctx context.Context, c *ba.Client) (any, error) {
 				return c.Workspaces.List(ctx, ba.ListWorkspacesParams{})
 			}, Unknown: true},
-		{Name: "missing hosts", Exchanges: get(`{"mode":"allowlist"}`), Call: getCall,
+		{Name: "missing hosts", Exchanges: get(`{"mode":"allowlist"}`), Call: tasksDecodeError("getWorkspace", getCall),
 			Err: `blazingagents: getWorkspace: decode response: NetworkPolicy allowlist: missing "allowedHosts"`},
-		{Name: "null hosts", Exchanges: get(`{"mode":"allowlist","allowedHosts":null}`), Call: getCall,
+		{Name: "null hosts", Exchanges: get(`{"mode":"allowlist","allowedHosts":null}`), Call: tasksDecodeError("getWorkspace", getCall),
 			Err: `blazingagents: getWorkspace: decode response: NetworkPolicy allowlist: missing "allowedHosts"`},
-		{Name: "missing mode", Exchanges: get(`{"allowedHosts":[]}`), Call: getCall,
+		{Name: "missing mode", Exchanges: get(`{"allowedHosts":[]}`), Call: tasksDecodeError("getWorkspace", getCall),
 			Err: `blazingagents: getWorkspace: decode response: NetworkPolicy: missing "mode"`},
 		{Name: "host field of the wrong type", Exchanges: []testkit.Exchange{{Op: "getWorkspace", Path: path, RespBody: `{"id":[]}`}}, Call: getCall,
 			ErrPrefix: "blazingagents: getWorkspace: decode response: json: "},

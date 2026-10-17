@@ -3,6 +3,7 @@ package blazingagents_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -188,7 +189,7 @@ func TestTasksRequests(t *testing.T) {
 				return c.Tasks.ListRunMessages(ctx, task, run, ba.ListTaskRunMessagesParams{After: new("a1"), Limit: new(5)})
 			},
 			Check: func(t *testing.T, got any) {
-				testkit.CoversExample(t, ex("listTaskRunMessages", 200), got)
+				tasksCovers(ex("listTaskRunMessages", 200))(t, got)
 				l := got.(*ba.TaskRunMessageList)
 				if len(l.Data) != 1 || l.Data[0].Role != ba.MessageRoleAssistant || l.NextCursor != "" || l.LatestCursor == nil || *l.LatestCursor != "eyJzZXEiOjEyfQ" ||
 					l.Status != ba.TaskRunStatusSucceeded || l.Error != nil || l.FinishedAt == nil {
@@ -315,6 +316,19 @@ func TestTasksDecoding(t *testing.T) {
 			},
 		},
 	})
+}
+
+// tasksDecodeError wraps call for a Case.Err check: it passes the error through only when it is a
+// *DecodeError for opID and the result is nil, so any other outcome fails the message comparison.
+func tasksDecodeError(opID string, call func(context.Context, *ba.Client) (any, error)) func(context.Context, *ba.Client) (any, error) {
+	return func(ctx context.Context, c *ba.Client) (any, error) {
+		got, err := call(ctx, c)
+		var de *ba.DecodeError
+		if !errors.As(err, &de) || de.OperationID != opID || (got != nil && !reflect.ValueOf(got).IsNil()) {
+			return got, fmt.Errorf("want a *DecodeError from %s and a nil result, got %T %v and %#v", opID, err, err, got)
+		}
+		return got, err
+	}
 }
 
 // tasksCollect drains a sequence twice and returns the ids seen, proving it restarts.
@@ -547,9 +561,9 @@ func TestTasksSchedule(t *testing.T) {
 					t.Fatalf("schedule %#v", got.(*ba.Task).Schedule)
 				}
 			}},
-		{Name: "missing required key", Exchanges: []testkit.Exchange{get(`{"kind":"once","config":{}}`)}, Call: call,
+		{Name: "missing required key", Exchanges: []testkit.Exchange{get(`{"kind":"once","config":{}}`)}, Call: tasksDecodeError("getTask", call),
 			Err: `blazingagents: getTask: decode response: Schedule once: missing "at"`},
-		{Name: "missing payload", Exchanges: []testkit.Exchange{get(`{"kind":"cron"}`)}, Call: call,
+		{Name: "missing payload", Exchanges: []testkit.Exchange{get(`{"kind":"cron"}`)}, Call: tasksDecodeError("getTask", call),
 			Err: `blazingagents: getTask: decode response: Schedule cron: missing "config"`},
 		{Name: "payload of the wrong type", Exchanges: []testkit.Exchange{get(`{"kind":"interval","config":{"everyMs":"soon"}}`)}, Call: call,
 			ErrPrefix: "blazingagents: getTask: decode response: json: "},
@@ -562,7 +576,7 @@ func TestTasksSchedule(t *testing.T) {
 			Call:    func(ctx context.Context, c *ba.Client) (any, error) { return c.Tasks.List(ctx, ba.ListTasksParams{}) },
 			Unknown: true},
 		{Name: "list missing required key", Exchanges: []testkit.Exchange{{Op: "listTasks", Path: "/v1/tasks", RespBody: `{"data":[{"id":"` + string(task) + `","schedule":{"kind":"interval","config":{}}}],"nextCursor":null}`}},
-			Call: func(ctx context.Context, c *ba.Client) (any, error) { return c.Tasks.List(ctx, ba.ListTasksParams{}) },
+			Call: tasksDecodeError("listTasks", func(ctx context.Context, c *ba.Client) (any, error) { return c.Tasks.List(ctx, ba.ListTasksParams{}) }),
 			Err:  `blazingagents: listTasks: decode response: Schedule interval: missing "everyMs"`},
 	})
 }
