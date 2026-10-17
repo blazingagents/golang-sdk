@@ -24,7 +24,6 @@ import (
 
 const (
 	specPath      = "spec/openapi.json"
-	scopePath     = "spec/scope.json"
 	opPath        = "internal/op/op.go"
 	errorCodePath = "errorcode.go"
 	enumsPath     = "enums.go"
@@ -231,22 +230,8 @@ func generate() ([]file, error) {
 		return nil, fmt.Errorf("%s: %w", specPath, err)
 	}
 	s := &spec{doc: doc, comps: obj(obj(doc["components"])["schemas"])}
-	var scope struct {
-		UserScoped []string `json:"userScoped"`
-		TenantOnly []string `json:"tenantOnly"`
-	}
-	rawScope, err := os.ReadFile(scopePath)
-	if err != nil {
-		return nil, err
-	}
-	if err := json.Unmarshal(rawScope, &scope); err != nil {
-		return nil, fmt.Errorf("%s: %w", scopePath, err)
-	}
 	ops, err := s.operations()
 	if err != nil {
-		return nil, err
-	}
-	if err := applyScope(ops, scope.UserScoped, scope.TenantOnly); err != nil {
 		return nil, err
 	}
 	g := &gen{s: s, unions: map[string]*union{}, patterns: map[string]string{}, enums: map[string]map[string]bool{}}
@@ -295,6 +280,13 @@ func (s *spec) operations() ([]*operation, error) {
 				continue
 			}
 			op := &operation{id: id, method: strings.ToUpper(method), path: path, o: o}
+			switch scope, _ := o["x-scope"].(string); scope {
+			case "end-user":
+				op.userScoped = true
+			case "tenant":
+			default:
+				return nil, fmt.Errorf(`%s: %s (%s %s) has x-scope %q; want "end-user" or "tenant"`, specPath, id, op.method, path, scope)
+			}
 			for _, m := range regexp.MustCompile(`\{([^}]+)\}`).FindAllStringSubmatch(path, -1) {
 				op.params = append(op.params, m[1])
 			}
@@ -325,33 +317,6 @@ func (s *spec) operations() ([]*operation, error) {
 	}
 	sort.Slice(ops, func(i, j int) bool { return ops[i].id < ops[j].id })
 	return ops, nil
-}
-
-func applyScope(ops []*operation, user, tenant []string) error {
-	byID := map[string]*operation{}
-	for _, o := range ops {
-		byID[o.id] = o
-	}
-	seen := map[string]string{}
-	for list, ids := range map[string][]string{"userScoped": user, "tenantOnly": tenant} {
-		for _, id := range ids {
-			o, ok := byID[id]
-			if !ok {
-				return fmt.Errorf("%s: %s lists unknown operation %s", scopePath, list, id)
-			}
-			if prev, dup := seen[id]; dup {
-				return fmt.Errorf("%s: %s is in both %s and %s", scopePath, id, prev, list)
-			}
-			seen[id] = list
-			o.userScoped = list == "userScoped"
-		}
-	}
-	for _, o := range ops {
-		if _, ok := seen[o.id]; !ok {
-			return fmt.Errorf("%s: operation %s is in neither scope list", scopePath, o.id)
-		}
-	}
-	return nil
 }
 
 func bodyKind(o schema) (string, error) {
@@ -1118,7 +1083,7 @@ type Operation struct {
 	Query          []string // query parameter names; the encoder sends only these
 	Body           BodyKind
 	Response       ResponseKind
-	UserScoped     bool // in spec/scope.json userScoped
+	UserScoped     bool // x-scope "end-user"
 	CredentialSafe bool // tag providers, mcp-connections or chat-connections, or path exactly /v1/merchant-connection
 }
 
