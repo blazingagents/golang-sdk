@@ -94,9 +94,9 @@ func TestUnionEdges(t *testing.T) {
 			Call: func(ctx context.Context, c *ba.Client) (any, error) { return c.Workspaces.Get(ctx, ws) }, Example: `{"id":"` + string(ws) + `","networkPolicy":null}`},
 		{Name: "connection without a configuration", Exchanges: []testkit.Exchange{{Op: "getChatConnection", Path: "/v1/chat-connections/" + string(conn), RespBody: `{"id":"` + string(conn) + `"}`}},
 			Call: func(ctx context.Context, c *ba.Client) (any, error) { return c.ChatConnections.Get(ctx, conn) }, Example: `{"id":"` + string(conn) + `","configuration":null}`},
-		{Name: "copy API error", Exchanges: []testkit.Exchange{{Op: "copySkill", Body: `{"agentIds":[]}`, Status: 404, RespBody: `{"error":{"code":"skill_not_found","message":"No skill"}}`}},
+		{Name: "copy API error", Exchanges: []testkit.Exchange{{Op: "copySkill", Body: `{"agentIds":["a"]}`, Status: 404, RespBody: `{"error":{"code":"skill_not_found","message":"No skill"}}`}},
 			Call: func(ctx context.Context, c *ba.Client) (any, error) {
-				return c.Skills.Copy(ctx, "a", "s", ba.CopySkillParams{AgentIDs: []ba.AgentID{}})
+				return c.Skills.Copy(ctx, "a", "s", ba.CopySkillParams{AgentIDs: []ba.AgentID{"a"}})
 			},
 			Err: "blazingagents: copySkill: 404 skill_not_found: No skill"},
 		{Name: "list API error", Exchanges: []testkit.Exchange{{Op: "listProviders", Status: 401, RespBody: `{"error":{"code":"unauthorized","message":"No"}}`}},
