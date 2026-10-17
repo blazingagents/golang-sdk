@@ -110,10 +110,10 @@ type MCPConnectionErrorCode string
 
 // MCPConnectionErrorCode values.
 const (
-	MCPConnectionErrorCodeMCPConnectionAuthenticationFailed MCPConnectionErrorCode = "MCP_CONNECTION_AUTHENTICATION_FAILED"
-	MCPConnectionErrorCodeMCPConnectionDiscoveryFailed      MCPConnectionErrorCode = "MCP_CONNECTION_DISCOVERY_FAILED"
-	MCPConnectionErrorCodeMCPConnectionInvalid              MCPConnectionErrorCode = "MCP_CONNECTION_INVALID"
-	MCPConnectionErrorCodeMCPConnectionUnreachable          MCPConnectionErrorCode = "MCP_CONNECTION_UNREACHABLE"
+	MCPConnectionErrorCodeAuthenticationFailed MCPConnectionErrorCode = "MCP_CONNECTION_AUTHENTICATION_FAILED"
+	MCPConnectionErrorCodeDiscoveryFailed      MCPConnectionErrorCode = "MCP_CONNECTION_DISCOVERY_FAILED"
+	MCPConnectionErrorCodeInvalid              MCPConnectionErrorCode = "MCP_CONNECTION_INVALID"
+	MCPConnectionErrorCodeUnreachable          MCPConnectionErrorCode = "MCP_CONNECTION_UNREACHABLE"
 )
 
 // MCPConnectionStatus is a string enum of the API. A value this SDK does not list decodes as itself.

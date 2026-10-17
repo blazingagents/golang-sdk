@@ -46,7 +46,7 @@ Only the generated code, the generator, the gate, the test kit and the examples 
 
 - `internal/op/op.go`: one `Operation` per spec operation with its method, path, parameters, body and response kind, the scoped request constructors, `op.All`, the request fields `params_test.go` checks, `op.IDPatterns` and the union sites.
 - `errorcode.go`: one `ErrorCode` constant per declared error code.
-- `enums.go`: one type per string enum, with constants named `<TypeName><PascalCaseValue>`.
+- `enums.go`: one type per string enum, with constants named `<TypeName><PascalCaseValue>`. Leading words the value repeats from the type name are dropped, so `MCP_CONNECTION_INVALID` of `MCPConnectionErrorCode` is `MCPConnectionErrorCodeInvalid`. The generator fails when two values would name the same constant.
 
 To take a new platform spec, run `specgen -sync <path>`, then add a method and tests for each new operation until the gate passes. A new union, ID prefix or enum needs an entry in the generator's naming tables, and `-check` names the missing one.
 

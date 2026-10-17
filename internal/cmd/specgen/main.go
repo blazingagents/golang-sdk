@@ -259,11 +259,12 @@ func generate() ([]file, error) {
 	if err != nil {
 		return nil, err
 	}
-	codes, err := s.errorCodes()
+	consts := map[string]string{}
+	codes, err := s.errorCodes(consts)
 	if err != nil {
 		return nil, err
 	}
-	enums, err := g.renderEnums()
+	enums, err := g.renderEnums(consts)
 	if err != nil {
 		return nil, err
 	}
@@ -991,7 +992,8 @@ func writeFields(b *bytes.Buffer, fs []field, depth int) {
 	b.WriteString("}")
 }
 
-func (s *spec) errorCodes() ([]byte, error) {
+// errorCodes renders errorcode.go, recording each constant in consts.
+func (s *spec) errorCodes(consts map[string]string) ([]byte, error) {
 	apiErr := obj(s.comps["ApiError"])
 	code := obj(obj(obj(obj(apiErr["properties"])["error"])["properties"])["code"])
 	values := arr(code["enum"])
@@ -1004,7 +1006,11 @@ func (s *spec) errorCodes() ([]byte, error) {
 	b.WriteString("// The error codes the API declares.\nconst (\n")
 	for _, v := range values {
 		c := v.(string)
-		fmt.Fprintf(&b, "\tErrorCode%s ErrorCode = %q\n", pascal(c), c)
+		name, err := constName(consts, "ErrorCode", c)
+		if err != nil {
+			return nil, err
+		}
+		fmt.Fprintf(&b, "\t%s ErrorCode = %q\n", name, c)
 	}
 	b.WriteString(")\n")
 	return format.Source(b.Bytes())
@@ -1012,6 +1018,11 @@ func (s *spec) errorCodes() ([]byte, error) {
 
 // pascal converts snake_case or camelCase to PascalCase with Go initialisms.
 func pascal(s string) string {
+	return strings.Join(pascalWords(s), "")
+}
+
+// pascalWords are the words of pascal(s), each capitalized or an initialism.
+func pascalWords(s string) []string {
 	var words []string
 	for _, part := range strings.Split(s, "_") {
 		start := 0
@@ -1023,18 +1034,18 @@ func pascal(s string) string {
 		}
 		words = append(words, part[start:])
 	}
-	var out strings.Builder
+	var out []string
 	for _, w := range words {
 		if w == "" {
 			continue
 		}
 		if up, ok := initialisms[strings.ToLower(w)]; ok {
-			out.WriteString(up)
+			out = append(out, up)
 			continue
 		}
-		out.WriteString(strings.ToUpper(w[:1]) + w[1:])
+		out = append(out, strings.ToUpper(w[:1])+w[1:])
 	}
-	return out.String()
+	return out
 }
 
 func goParam(p string) string {
@@ -1186,7 +1197,8 @@ func (g *gen) addEnum(name string, vals []string) {
 	}
 }
 
-func (g *gen) renderEnums() ([]byte, error) {
+// renderEnums renders enums.go, recording each constant in consts.
+func (g *gen) renderEnums(consts map[string]string) ([]byte, error) {
 	for union, name := range tagEnums {
 		g.addEnum(name, sortedKeys(g.unions[union].variants))
 	}
@@ -1195,13 +1207,11 @@ func (g *gen) renderEnums() ([]byte, error) {
 	for _, name := range sortedKeys(g.enums) {
 		fmt.Fprintf(&b, "\n// %s is a string enum of the API. A value this SDK does not list decodes as itself.\ntype %s string\n\n", name, name)
 		fmt.Fprintf(&b, "// %s values.\nconst (\n", name)
-		seen := map[string]string{}
 		for _, v := range sortedKeys(g.enums[name]) {
-			c := name + valueName(v)
-			if prev, dup := seen[c]; dup {
-				return nil, fmt.Errorf("enum %s: values %q and %q both name %s", name, prev, v, c)
+			c, err := constName(consts, name, v)
+			if err != nil {
+				return nil, err
 			}
-			seen[c] = v
 			if note := enumNotes[name+"."+v]; note != "" {
 				fmt.Fprintf(&b, "\t// %s is %s.\n", c, note)
 			}
@@ -1212,13 +1222,34 @@ func (g *gen) renderEnums() ([]byte, error) {
 	return format.Source(b.Bytes())
 }
 
-// valueName is the PascalCase of an enum value: "vercel_ai_gateway" is VercelAIGateway,
-// "tar.gz" TarGz, "MCP_CONNECTION_INVALID" MCPConnectionInvalid.
-func valueName(v string) string {
+// constName names the constant of value v of enum typ and records it in consts, failing when
+// a value of any enum already took the name.
+func constName(consts map[string]string, typ, v string) (string, error) {
+	c := typ + valueName(typ, v)
+	this := fmt.Sprintf("%s %q", typ, v)
+	if prev, dup := consts[c]; dup {
+		return "", fmt.Errorf("%s and %s both name the constant %s", prev, this, c)
+	}
+	consts[c] = this
+	return c, nil
+}
+
+// valueName is the PascalCase of an enum value of typ: "vercel_ai_gateway" is VercelAIGateway,
+// "tar.gz" TarGz. Leading words the value shares with the leading words of typ are dropped,
+// keeping at least one, so the constant does not stutter: "MCP_CONNECTION_INVALID" of
+// MCPConnectionErrorCode is Invalid.
+func valueName(typ, v string) string {
 	if strings.ToUpper(v) == v {
 		v = strings.ToLower(v)
 	}
-	return pascal(strings.NewReplacer("-", "_", ".", "_", " ", "_").Replace(v))
+	words := pascalWords(strings.NewReplacer("-", "_", ".", "_", " ", "_").Replace(v))
+	for k := len(words) - 1; k > 0; k-- {
+		p := strings.Join(words[:k], "")
+		if rest, ok := strings.CutPrefix(typ, p); ok && (rest == "" || rest[0] >= 'A' && rest[0] <= 'Z') {
+			return strings.Join(words[k:], "")
+		}
+	}
+	return strings.Join(words, "")
 }
 
 // enumOf is the Go enum type of a schema's string enum, or "".
