@@ -130,6 +130,22 @@ func TestChatInputs(t *testing.T) {
 			t.Errorf("%s: error %v", name, err)
 		}
 	}
+	for name, call := range map[string]func() (*ba.ChatStream, error){
+		"*blazingagents.SavedPrompt is not a ChatInput variant": func() (*ba.ChatStream, error) {
+			return c.Chat.Send(ctx, ids.agent, &ba.SavedPrompt{ID: prompt}, ba.ChatParams{})
+		},
+		"*blazingagents.SavedPrompt is not a RegenerateInput variant": func() (*ba.ChatStream, error) {
+			return c.Chat.Regenerate(ctx, ids.agent, ids.session, &ba.SavedPrompt{ID: prompt}, ba.RegenerateParams{})
+		},
+		"*blazingagents.UserMessage is not a RegenerateInput variant": func() (*ba.ChatStream, error) {
+			m := ba.TextMessage("hi")
+			return c.Chat.Regenerate(ctx, ids.agent, ids.session, &m, ba.RegenerateParams{})
+		},
+	} {
+		if _, err := call(); err == nil || err.Error() != "blazingagents: invalid argument input: "+name+"; pass the value" {
+			t.Errorf("%s: error %v", name, err)
+		}
+	}
 	if _, err := c.Chat.Continue(ctx, ids.agent, ids.session, nil, ba.ContinueParams{}); err == nil || err.Error() != "blazingagents: invalid argument decisions: empty" {
 		t.Errorf("continue: error %v", err)
 	}
@@ -364,6 +380,42 @@ func TestUserMessageJSON(t *testing.T) {
 		if err := json.Unmarshal([]byte(body), &m); err == nil || err.Error() != want {
 			t.Errorf("%s: error %v, want %s", body, err, want)
 		}
+	}
+}
+
+func TestMessageJSON(t *testing.T) {
+	ids := newChatIDs()
+	raw := `{"id":"m1","role":"assistant","branchable":true,"parts":[{"type":"text","text":"hi"}],"metadata":{"a":1},"createdAt":"2026-01-02T03:04:05Z","annotations":[{"n":1}],"note":null}`
+	testkit.Run(t, []testkit.Case{{
+		Name:      "unknown top-level fields survive",
+		Exchanges: []testkit.Exchange{{Op: "listSessionMessages", RespBody: `{"data":[` + raw + `],"nextCursor":null,"latestCursor":null}`}},
+		Call: func(ctx context.Context, c *ba.Client) (any, error) {
+			return c.Sessions.ListMessages(ctx, ids.agent, ids.session, ba.ListSessionMessagesParams{})
+		},
+		Check: func(t *testing.T, got any) {
+			m := got.(*ba.SessionMessageList).Data[0]
+			if m.ID != "m1" || m.Role != ba.MessageRoleAssistant || !m.Branchable || len(m.Parts) != 1 || string(m.Metadata) != `{"a":1}` {
+				t.Fatalf("decoded %#v", m)
+			}
+			if out := jsonString(m); !jsonEqualString(out, raw) {
+				t.Fatalf("re-encoded %s", out)
+			}
+		},
+	}})
+	var m ba.Message
+	if err := json.Unmarshal([]byte(`{"id":"m2","role":"user","branchable":false,"parts":[]}`), &m); err != nil {
+		t.Fatal(err)
+	}
+	if out := jsonString(m); out != `{"id":"m2","role":"user","branchable":false,"parts":[]}` {
+		t.Fatalf("re-encoded %s", out)
+	}
+	for _, body := range []string{`[]`, `{"id":1}`} {
+		if err := json.Unmarshal([]byte(body), &m); err == nil {
+			t.Errorf("%s decoded", body)
+		}
+	}
+	if _, err := json.Marshal(ba.Message{Metadata: json.RawMessage(`{`)}); err == nil {
+		t.Error("invalid metadata marshaled")
 	}
 }
 

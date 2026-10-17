@@ -493,11 +493,18 @@ func list[T any](key string) func(*body, error) ([]T, error) {
 		if err != nil {
 			return nil, err
 		}
-		var env map[string][]T
+		var env map[string]json.RawMessage
 		if err := json.Unmarshal(b.data, &env); err != nil {
 			return nil, b.decodeError(err)
 		}
-		return env[key], nil
+		if absent(env[key]) {
+			return nil, nil
+		}
+		var v []T
+		if err := json.Unmarshal(env[key], &v); err != nil {
+			return nil, b.decodeError(err)
+		}
+		return v, nil
 	}
 }
 

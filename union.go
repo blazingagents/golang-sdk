@@ -88,3 +88,9 @@ func encodeVariant(name, tag string, fields any) ([]byte, error) {
 	}
 	return b.Bytes(), nil
 }
+
+// notAVariant rejects a value of a sealed input union that matched no variant: a pointer to
+// one, since the marker methods have value receivers.
+func notAVariant(name, union string, v any) *ArgumentError {
+	return &ArgumentError{Name: name, Reason: fmt.Sprintf("%T is not a %s variant; pass the value", v, union)}
+}

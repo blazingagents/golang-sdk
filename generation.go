@@ -74,6 +74,8 @@ func (s *GenerationService) open(ctx context.Context, agentID AgentID, prompt Pr
 		b.Prompt = new(string(p))
 	case SavedPrompt:
 		b.PromptID, b.Variables = p.ID, p.Variables
+	default: // a pointer to a variant
+		return nil, notAVariant("prompt", "PromptInput", p)
 	}
 	resp, c, err := s.s.open(ctx, op.Generate(string(agentID)), b, opts)
 	if err != nil {

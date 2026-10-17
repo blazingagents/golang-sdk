@@ -144,6 +144,14 @@ func TestGenerationStreamFailures(t *testing.T) {
 	if _, err := m.Client().Generation.Completion(context.Background(), agent, nil, ba.GenerateParams{}); err == nil || err.Error() != "blazingagents: invalid argument prompt: nil" {
 		t.Fatalf("nil prompt: %v", err)
 	}
+	for want, prompt := range map[string]ba.PromptInput{
+		"*blazingagents.Text":        new(ba.Text("p")),
+		"*blazingagents.SavedPrompt": &ba.SavedPrompt{ID: "p"},
+	} {
+		if _, err := m.Client().Generation.Completion(context.Background(), agent, prompt, ba.GenerateParams{}); err == nil || err.Error() != "blazingagents: invalid argument prompt: "+want+" is not a PromptInput variant; pass the value" {
+			t.Errorf("%s: error %v", want, err)
+		}
+	}
 }
 
 func TestGenerationObject(t *testing.T) {

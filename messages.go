@@ -181,13 +181,50 @@ func decodeUserPart(raw json.RawMessage) (UserPart, error) {
 	return UnknownPart{Type: typ, Raw: append(json.RawMessage(nil), raw...)}, nil
 }
 
-// Message is a stored transcript message, of a session or a task run.
+// Message is a stored transcript message, of a session or a task run. Decoding keeps fields
+// this SDK does not know, and encoding writes them again.
 type Message struct {
 	ID         string            `json:"id"`
 	Role       MessageRole       `json:"role"`
 	Branchable bool              `json:"branchable"`
 	Parts      []json.RawMessage `json:"parts"`
 	Metadata   json.RawMessage   `json:"metadata,omitzero"`
+	extra      map[string]json.RawMessage
+}
+
+// messageFields is Message without its JSON methods.
+type messageFields Message
+
+func (m *Message) UnmarshalJSON(b []byte) error {
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(b, &obj); err != nil {
+		return err
+	}
+	var f messageFields
+	if err := json.Unmarshal(b, &f); err != nil {
+		return err
+	}
+	for _, k := range []string{"id", "role", "branchable", "parts", "metadata"} {
+		delete(obj, k)
+	}
+	if len(obj) > 0 {
+		f.extra = obj
+	}
+	*m = Message(f)
+	return nil
+}
+
+func (m Message) MarshalJSON() ([]byte, error) {
+	data, err := json.Marshal(messageFields(m))
+	if err != nil || m.extra == nil {
+		return data, err
+	}
+	out := map[string]json.RawMessage{}
+	for k, v := range m.extra {
+		out[k] = v
+	}
+	_ = json.Unmarshal(data, &out) // data is the object just marshaled; its fields win
+	return json.Marshal(out)
 }
 
 // newUUID is a random UUIDv4.
