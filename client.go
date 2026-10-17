@@ -68,7 +68,8 @@ type UserClient struct {
 }
 
 // userOps is held by every service on both clients; it accepts only op.UserScoped.
-// tenantOps is held by tenant-only services and accepts any operation.
+// tenantOps is held by tenant-only services; it accepts only op.TenantOnly, so a
+// user-scoped operation cannot be left off the UserClient.
 type (
 	userOps   struct{ t *transport }
 	tenantOps struct{ t *transport }
@@ -91,7 +92,10 @@ type (
 
 // Tenant-only services.
 type (
-	UsageService               struct{ s tenantOps }
+	UsageService struct {
+		UserUsageService
+		s tenantOps
+	}
 	ProvidersService           struct{ s tenantOps }
 	MCPConnectionsService      struct{ s tenantOps }
 	TenantService              struct{ s tenantOps }
@@ -107,8 +111,8 @@ func (s userOps) send(ctx context.Context, r op.UserScoped, params any, opts []R
 	return s.t.send(ctx, r.Request, params, opts)
 }
 
-func (s tenantOps) send(ctx context.Context, r op.Scoped, params any, opts []RequestOption) (*body, error) {
-	return s.t.send(ctx, r.Req(), params, opts)
+func (s tenantOps) send(ctx context.Context, r op.TenantOnly, params any, opts []RequestOption) (*body, error) {
+	return s.t.send(ctx, r.Request, params, opts)
 }
 
 // Option configures NewClient.
@@ -296,7 +300,7 @@ func newClient(t *transport) *Client {
 		Artifacts:           &ArtifactsService{u},
 		Chat:                &ChatService{u},
 		Generation:          &GenerationService{u},
-		Usage:               &UsageService{ten},
+		Usage:               &UsageService{UserUsageService{u}, ten},
 		Providers:           &ProvidersService{ten},
 		MCPConnections:      &MCPConnectionsService{ten},
 		Tenant:              &TenantService{ten},

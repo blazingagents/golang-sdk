@@ -141,21 +141,6 @@ type SessionUsageParams struct {
 
 var errNoSessionIDs = &ArgumentError{Name: "params.SessionIDs", Reason: "empty; send 1 to 100 session IDs"}
 
-// Get returns the tenant's usage. It sends getUsage:
-// https://docs.blazingagents.com/api-reference/rest-api/usage#get-usage
-func (s *UsageService) Get(ctx context.Context, params UsageParams, opts ...RequestOption) (*Usage, error) {
-	return decode[Usage](s.s.send(ctx, op.GetUsage(), params, opts))
-}
-
-// Sessions returns exact usage for 1 to 100 sessions. It sends getSessionUsage:
-// https://docs.blazingagents.com/api-reference/rest-api/usage#get-session-usage
-func (s *UsageService) Sessions(ctx context.Context, params SessionUsageParams, opts ...RequestOption) (*SessionUsage, error) {
-	if len(params.SessionIDs) == 0 {
-		return nil, errNoSessionIDs
-	}
-	return decode[SessionUsage](s.s.send(ctx, op.GetSessionUsage(), params, opts))
-}
-
 // Overview returns totals, a daily series and the top agents, users and models. It sends
 // getUsageOverview:
 // https://docs.blazingagents.com/api-reference/rest-api/usage#get-usage-overview
@@ -163,25 +148,25 @@ func (s *UsageService) Overview(ctx context.Context, params UsageOverviewParams,
 	return decode[UsageOverview](s.s.send(ctx, op.GetUsageOverview(), params, opts))
 }
 
-// ForAgent returns one agent's usage. An agent without usage, including one that does not
-// exist, has zero totals and no buckets. It sends getAgentUsage:
-// https://docs.blazingagents.com/api-reference/rest-api/usage#get-agent-usage
-func (s *UsageService) ForAgent(ctx context.Context, agentID AgentID, params AgentUsageParams, opts ...RequestOption) (*Usage, error) {
-	return decode[Usage](s.s.send(ctx, op.GetAgentUsage(string(agentID)), params, opts))
-}
-
-// Get returns this user's usage. It sends getUsage:
+// Get returns usage: the tenant's on a Client, this user's on a UserClient. It sends getUsage:
 // https://docs.blazingagents.com/api-reference/rest-api/usage#get-usage
 func (s *UserUsageService) Get(ctx context.Context, params UsageParams, opts ...RequestOption) (*Usage, error) {
 	return decode[Usage](s.s.send(ctx, op.GetUsage(), params, opts))
 }
 
-// Sessions returns exact usage for 1 to 100 of this user's sessions. It sends
-// getSessionUsage:
+// Sessions returns exact usage for 1 to 100 sessions; a UserClient may name only this
+// user's. It sends getSessionUsage:
 // https://docs.blazingagents.com/api-reference/rest-api/usage#get-session-usage
 func (s *UserUsageService) Sessions(ctx context.Context, params SessionUsageParams, opts ...RequestOption) (*SessionUsage, error) {
 	if len(params.SessionIDs) == 0 {
 		return nil, errNoSessionIDs
 	}
 	return decode[SessionUsage](s.s.send(ctx, op.GetSessionUsage(), params, opts))
+}
+
+// ForAgent returns one agent's usage. An agent without usage, including one that does not
+// exist, has zero totals and no buckets. It sends getAgentUsage:
+// https://docs.blazingagents.com/api-reference/rest-api/usage#get-agent-usage
+func (s *UserUsageService) ForAgent(ctx context.Context, agentID AgentID, params AgentUsageParams, opts ...RequestOption) (*Usage, error) {
+	return decode[Usage](s.s.send(ctx, op.GetAgentUsage(string(agentID)), params, opts))
 }

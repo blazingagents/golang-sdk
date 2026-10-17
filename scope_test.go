@@ -43,7 +43,7 @@ func TestScopeWiring(t *testing.T) {
 		switch {
 		case name == "Usage":
 			if ops != "tenantOps" {
-				t.Errorf("Client.Usage holds %q: getAgentUsage stays off the user client", ops)
+				t.Errorf("Client.Usage holds %q: getUsageOverview is tenant only", ops)
 			}
 		case slices.Contains(want, name):
 			if ops != "userOps" {

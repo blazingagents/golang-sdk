@@ -174,6 +174,8 @@ func TestUsageForUser(t *testing.T) {
 	scoped := http.Header{"X-Ba-User-Id": {"user-7"}}
 	m.Expect(testkit.Exchange{Op: "getUsage", Path: "/v1/usage", Header: scoped, Query: url.Values{"groupBy": {"agent"}}, RespBody: testkit.Example("getUsage", 200)})
 	m.Expect(testkit.Exchange{Op: "getSessionUsage", Path: "/v1/usage/sessions", Header: scoped, Body: `{"sessionIds":["` + string(session) + `"]}`, RespBody: testkit.Example("getSessionUsage", 200)})
+	agent := ba.AgentID(testkit.ID(op.IDPatterns["AgentID"]))
+	m.Expect(testkit.Exchange{Op: "getAgentUsage", Path: "/v1/agents/" + string(agent) + "/usage", Header: scoped, RespBody: testkit.Example("getAgentUsage", 200)})
 	ctx := context.Background()
 	usage, err := user.Usage.Get(ctx, ba.UsageParams{GroupBy: new(ba.UsageGroupByAgent)})
 	if err != nil {
@@ -185,6 +187,11 @@ func TestUsageForUser(t *testing.T) {
 		t.Fatal(err)
 	}
 	testkit.CoversExample(t, testkit.Example("getSessionUsage", 200), sessions)
+	forAgent, err := user.Usage.ForAgent(ctx, agent, ba.AgentUsageParams{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	testkit.CoversExample(t, testkit.Example("getAgentUsage", 200), forAgent)
 	_, err = user.Usage.Sessions(ctx, ba.SessionUsageParams{})
 	var argErr *ba.ArgumentError
 	if !errors.As(err, &argErr) || argErr.Name != "params.SessionIDs" || err.Error() != "blazingagents: invalid argument params.SessionIDs: empty; send 1 to 100 session IDs" {
