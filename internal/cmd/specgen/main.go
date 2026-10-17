@@ -1128,17 +1128,13 @@ type Request struct {
 	Segments []string
 }
 
-// Scoped is implemented by UserScoped and TenantOnly.
-type Scoped interface{ Req() Request }
-
 // UserScoped is returned by the constructor of every operation a user-scoped client may send.
 type UserScoped struct{ Request }
 
-// TenantOnly is returned by the constructor of every other operation.
+// TenantOnly is returned by the constructor of every other operation. Only tenant-only
+// services send one, so a user-scoped operation always goes through a service the
+// UserClient can also hold.
 type TenantOnly struct{ Request }
-
-func (r UserScoped) Req() Request { return r.Request }
-func (r TenantOnly) Req() Request { return r.Request }
 `
 
 const fieldDecl = `// Field is one input of an operation, for the params shape test.
