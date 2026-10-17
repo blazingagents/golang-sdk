@@ -31,11 +31,12 @@ git merge-base --is-ancestor HEAD "$main_ref" ||
   fail "commit $(git rev-parse --short HEAD) is not on $main_ref; tag a commit that has merged to main"
 
 # The entry is every line after "## X.Y.Z" (optionally followed by a date) up to the next "## "
-# heading, with blank lines trimmed from both ends.
+# heading outside a code fence, with blank lines trimmed from both ends.
 awk -v v="$version" '
-  /^## / { if (found) exit; split($0, w, " "); found = (w[2] == v); next }
+  /^(```|~~~)/ { fence = !fence }
+  /^## / && !fence { if (found) exit; split($0, w, " "); found = (w[2] == v); next }
   found { print }
-' CHANGELOG.md | sed -e '/./,$!d' | tac | sed -e '/./,$!d' | tac >"$notes"
+' CHANGELOG.md | sed -e '/[^[:space:]]/,$!d' | tac | sed -e '/[^[:space:]]/,$!d' | tac >"$notes"
 [ -s "$notes" ] || fail "CHANGELOG.md has no non-empty \"## $version\" entry; add one in a PR before tagging"
 
 echo "version=$version"

@@ -102,6 +102,6 @@ The tag push is the release, and it is the irreversible step. The Release workfl
 3. Creates the GitHub release with that entry as its body, marked as a prerelease for a suffixed tag.
 4. Asks `proxy.golang.org` for the version so pkg.go.dev lists it.
 
-A failed check means only that the GitHub release was not created. The tag is still public. Fix the cause in a new version rather than moving the tag. If the proxy step fails, rerun the job: the release step skips a release that already exists. To check the script by hand, run `.github/scripts/release-check.sh vX.Y.Z /tmp/notes.md` from the repository root.
+A failed check means only that the GitHub release was not created. The tag is still public. Fix the cause in a new version rather than moving the tag. If the proxy job fails, rerun the failed jobs: the release job skips a release that already exists. To check the script by hand, run `.github/scripts/release-check.sh vX.Y.Z /tmp/notes.md` from the repository root.
 
 A bad release is not deleted. Fix it in a new version, and add a `retract vX.Y.Z` directive with a reason to `go.mod` in that version. The module stays at v0 until its API is stable. A v2 or later needs the `/v2` module path suffix.

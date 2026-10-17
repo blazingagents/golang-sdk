@@ -5,8 +5,8 @@ name: Release
 # the tag, creates the GitHub release and asks the proxy for the version so pkg.go.dev lists
 # it. A failed check means only that the GitHub release was not created.
 #
-# workflow_dispatch is a dry run on the selected branch: every check runs against its HEAD, and
-# nothing is released or fetched.
+# workflow_dispatch is a dry run on the selected branch: the gate and the checks run against its
+# HEAD. The jobs that create the release and fetch the version run only on a tag push.
 
 on:
   push:
@@ -28,58 +28,80 @@ jobs:
   ci:
     uses: ./.github/workflows/ci.yml
 
-  release:
-    name: Release
+  check:
+    name: Check the tag
     needs: [ci]
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
-    env:
-      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' }}
-      GH_TOKEN: ${{ github.token }}
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.check.outputs.tag }}
+      prerelease: ${{ steps.check.outputs.prerelease }}
+      notes: ${{ steps.check.outputs.notes }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Check the tag
         id: check
         env:
           INPUT_TAG: ${{ inputs.tag }}
         run: |
           tag=${INPUT_TAG:-$GITHUB_REF_NAME}
-          if [ "$DRY_RUN" = true ] && [ -z "$INPUT_TAG" ]; then
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && [ -z "$INPUT_TAG" ]; then
             tag=v$(sed -nE 's/^[[:space:]]*Version[[:space:]]*=[[:space:]]*"([^"]*)".*/\1/p' client.go)
           fi
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          .github/scripts/release-check.sh "$tag" "$RUNNER_TEMP/notes.md" >> "$GITHUB_OUTPUT"
+          notes=$RUNNER_TEMP/notes.md
+          .github/scripts/release-check.sh "$tag" "$notes" >> "$GITHUB_OUTPUT"
+          delim=EOF-$(openssl rand -hex 16)
+          {
+            echo "tag=$tag"
+            echo "notes<<$delim"
+            cat "$notes"
+            echo "$delim"
+          } >> "$GITHUB_OUTPUT"
           {
             echo "## Release notes for $tag"
             echo
-            cat "$RUNNER_TEMP/notes.md"
+            cat "$notes"
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: Create the GitHub release
-        if: env.DRY_RUN != 'true'
-        env:
-          TAG: ${{ steps.check.outputs.tag }}
-          PRERELEASE: ${{ steps.check.outputs.prerelease }}
+
+  release:
+    name: Create the GitHub release
+    needs: [check]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.check.outputs.tag }}
+          PRERELEASE: ${{ needs.check.outputs.prerelease }}
+          NOTES: ${{ needs.check.outputs.notes }}
         run: |
-          # A rerun after a later step failed finds the release already there.
+          # A rerun after the proxy job failed finds the release already there.
           if gh release view "$TAG" > /dev/null 2>&1; then
             echo "::notice::the GitHub release $TAG already exists"
             exit 0
           fi
-          gh release create "$TAG" --verify-tag --title "$TAG" \
-            --notes-file "$RUNNER_TEMP/notes.md" --prerelease="$PRERELEASE"
+          gh release create "$TAG" --verify-tag --title "$TAG" --notes "$NOTES" --prerelease="$PRERELEASE"
+
+  proxy:
+    name: Ask the module proxy for the version
+    needs: [check, release]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
-        if: env.DRY_RUN != 'true'
         with:
           go-version: "1.27.x"
           cache: false
-      - name: Ask the module proxy for the version
-        if: env.DRY_RUN != 'true'
-        env:
-          TAG: ${{ steps.check.outputs.tag }}
+      - env:
+          TAG: ${{ needs.check.outputs.tag }}
         run: |
           for attempt in 1 2 3 4 5; do
             if GOPROXY=https://proxy.golang.org go list -m "github.com/blazingagents/golang-sdk@$TAG"; then
@@ -87,5 +109,5 @@ jobs:
             fi
             sleep $((attempt * 15))
           done
-          echo "::error::proxy.golang.org did not serve $TAG; rerun this job to retry"
+          echo "::error::proxy.golang.org did not serve $TAG; rerun the failed jobs to retry"
           exit 1
