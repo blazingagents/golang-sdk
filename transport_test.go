@@ -187,6 +187,18 @@ func TestParamsThatDoNotMarshal(t *testing.T) {
 	}
 }
 
+// A typed nil behind a params interface fails before anything is sent instead of panicking.
+func TestNilPointerParams(t *testing.T) {
+	m := testkit.New(t)
+	ctx := context.Background()
+	if _, err := m.Client().ChatConnections.Create(ctx, (*ba.SlackConnection)(nil)); err == nil || err.Error() != "blazingagents: invalid argument params: nil" {
+		t.Errorf("create: %v", err)
+	}
+	if _, err := m.Client().ChatConnections.RotateCredentials(ctx, "c", (*ba.TelegramCredentials)(nil)); err == nil || err.Error() != "blazingagents: invalid argument params: nil" {
+		t.Errorf("rotate: %v", err)
+	}
+}
+
 func TestHeaderParams(t *testing.T) {
 	m := testkit.New(t)
 	for _, key := range []string{"", "a\nb"} {

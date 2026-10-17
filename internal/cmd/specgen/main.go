@@ -114,7 +114,7 @@ var idTypes = map[string]string{
 // enum type of their items.
 var listStrings = map[string]string{"listTenantChatDeliveries.status": "ChatDeliveryStatus"}
 
-var initialisms = map[string]string{"ai": "AI", "api": "API", "id": "ID", "mcp": "MCP", "url": "URL",
+var initialisms = map[string]string{"ai": "AI", "api": "API", "id": "ID", "mcp": "MCP", "oauth": "OAuth", "url": "URL",
 	"openai": "OpenAI", "openrouter": "OpenRouter"}
 
 type unionSpec struct {

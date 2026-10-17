@@ -3,6 +3,7 @@ package blazingagents_test
 import (
 	"context"
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	ba "github.com/blazingagents/golang-sdk"
@@ -87,6 +88,8 @@ func TestUnionEdges(t *testing.T) {
 	task := ba.TaskID(testkit.ID(op.IDPatterns["TaskID"]))
 	ws := ba.WorkspaceID(testkit.ID(op.IDPatterns["WorkspaceID"]))
 	conn := ba.ChatConnectionID(testkit.ID(op.IDPatterns["ChatConnectionID"]))
+	provider := ba.ProviderID(testkit.ID(op.IDPatterns["ProviderID"]))
+	listProviders := func(ctx context.Context, c *ba.Client) (any, error) { return c.Providers.List(ctx) }
 	testkit.Run(t, []testkit.Case{
 		{Name: "payload not an object", Exchanges: []testkit.Exchange{{Op: "getTask", Path: "/v1/tasks/" + string(task), RespBody: `{"schedule":{"kind":"once","config":5}}`}},
 			Call: func(ctx context.Context, c *ba.Client) (any, error) { return c.Tasks.Get(ctx, task) }, ErrPrefix: "blazingagents: getTask: decode response: Schedule once: "},
@@ -103,10 +106,42 @@ func TestUnionEdges(t *testing.T) {
 			Call: func(ctx context.Context, c *ba.Client) (any, error) { return c.Providers.List(ctx) }, Err: "blazingagents: listProviders: 401 unauthorized: No"},
 		{Name: "list not an envelope", Exchanges: []testkit.Exchange{{Op: "listProviders", RespBody: `[]`}},
 			Call: func(ctx context.Context, c *ba.Client) (any, error) { return c.Providers.List(ctx) }, ErrPrefix: "blazingagents: listProviders: decode response: "},
+		{Name: "list with an unknown envelope field", Exchanges: []testkit.Exchange{{Op: "listProviders", RespBody: `{"providers":[{"id":"` + string(provider) + `"}],"total":1,"next":null}`}},
+			Call: listProviders, Example: `[{"id":"` + string(provider) + `"}]`},
+		{Name: "list with a null list", Exchanges: []testkit.Exchange{{Op: "listProviders", RespBody: `{"providers":null}`}},
+			Call: listProviders, Example: `null`},
+		{Name: "list items not an array", Exchanges: []testkit.Exchange{{Op: "listProviders", RespBody: `{"providers":{}}`}},
+			Call: listProviders, ErrPrefix: "blazingagents: listProviders: decode response: "},
 		{Name: "envelope API error", Exchanges: []testkit.Exchange{{Op: "getMerchantConnection", Status: 403, RespBody: `{"error":{"code":"forbidden","message":"No"}}`}},
 			Call: func(ctx context.Context, c *ba.Client) (any, error) { return c.MerchantConnection.Get(ctx) }, Err: "blazingagents: getMerchantConnection: 403 forbidden: No"},
 	})
 	if _, err := json.Marshal(ba.SkillCopyFailed{Error: ba.SkillCopyError{Code: "c", Details: json.RawMessage(`{`)}}); err == nil {
 		t.Fatal("a variant with invalid raw JSON marshaled")
+	}
+	// A pointer to a variant of a union that marshals itself sends the same tagged body.
+	for _, v := range []any{
+		ba.ScheduleCron{Expression: "0 9 * * *"}, ba.NetworkPolicyAllowlist{AllowedHosts: []string{"a.com"}}, ba.NetworkPolicyOffline{},
+		ba.ToolReferenceBuiltin{Name: ba.AgentToolRead}, ba.SlackConfiguration{ChannelIDs: []string{"C1"}}, ba.TextPart{Text: "hi"},
+	} {
+		ptr := reflect.New(reflect.TypeOf(v))
+		ptr.Elem().Set(reflect.ValueOf(v))
+		if got, want := jsonString(ptr.Interface()), jsonString(v); got != want {
+			t.Errorf("%T: pointer sent %s, value %s", v, got, want)
+		}
+	}
+}
+
+// Generated enum constants spell initialisms and brand names as Go does.
+func TestEnumInitialisms(t *testing.T) {
+	for got, want := range map[string]string{
+		string(ba.MCPAuthTypeOAuthAuthorizationCode): "oauth_authorization_code",
+		string(ba.MCPAuthTypeOAuthClientCredentials): "oauth_client_credentials",
+		string(ba.ProviderTypeOpenRouter):            "openrouter",
+		string(ba.ProviderTypeVercelAIGateway):       "vercel_ai_gateway",
+		string(ba.ArchiveTypeTarGz):                  "tar.gz",
+	} {
+		if got != want {
+			t.Errorf("constant is %q, want %q", got, want)
+		}
 	}
 }

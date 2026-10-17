@@ -88,6 +88,8 @@ func (s *ChatService) Send(ctx context.Context, agentID AgentID, input ChatInput
 		b.Messages = in
 	case SavedPrompt:
 		b.PromptID, b.Variables = in.ID, in.Variables
+	default: // a pointer to a variant
+		return nil, notAVariant("input", "ChatInput", in)
 	}
 	if params.SessionID == "" {
 		return s.start(ctx, op.CreateSessionTurn(string(agentID)), agentID, "", b, params.Functions, opts)
@@ -106,6 +108,8 @@ func (s *ChatService) Regenerate(ctx context.Context, agentID AgentID, sessionID
 		b.Messages = []UserMessage{in}
 	case SavedPrompt:
 		b.PromptID, b.Variables = in.ID, in.Variables
+	default:
+		return nil, notAVariant("input", "RegenerateInput", in)
 	}
 	return s.start(ctx, op.ResumeSessionTurn(string(agentID), string(sessionID)), agentID, sessionID, b, params.Functions, opts)
 }

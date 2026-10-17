@@ -10,6 +10,11 @@
 // Every API operation is a method on a service field of the client. Errors are *APIError,
 // *TimeoutError, *ConnectionError, *StreamError, *ObjectError, *DecodeError, *ArgumentError
 // or *CredentialEchoError.
+//
+// Response models ignore fields this SDK does not know, except UserMessage and Message, which
+// keep them and encode them again. An optional response field decodes as nil both when the
+// server omits it and when it sends null, so encoding a model again does not restore that
+// difference. A json.RawMessage field is the exception: it holds the null as sent.
 package blazingagents
 
 //go:generate go run ./internal/cmd/specgen
