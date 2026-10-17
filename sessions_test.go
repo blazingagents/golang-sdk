@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"reflect"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -560,12 +559,12 @@ func TestSessionsForkKey(t *testing.T) {
 		{name: "empty", key: "", want: "blazingagents: invalid argument params.IdempotencyKey: must be a non-empty valid header value"},
 		{name: "newline", key: "k\n1", want: "blazingagents: invalid argument params.IdempotencyKey: must be a non-empty valid header value"},
 		{name: "per call", key: "k1", opts: []ba.RequestOption{ba.WithRequestHeader("idempotency-key", "k2")}, err: ba.ErrInvalidHeader,
-			want: "blazingagents: invalid argument header idempotency-key: "},
+			want: "blazingagents: invalid argument header idempotency-key: set by the SDK"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := testkit.New(t).Client().Sessions.Fork(context.Background(), agent, session, ba.ForkSessionParams{MessageID: "m", IdempotencyKey: tc.key}, tc.opts...)
 			var ae *ba.ArgumentError
-			if got != nil || !errors.As(err, &ae) || !strings.HasPrefix(err.Error(), tc.want) || ae.Err != tc.err {
+			if got != nil || !errors.As(err, &ae) || err.Error() != tc.want || ae.Err != tc.err {
 				t.Fatalf("got %v, %v; want %s", got, err, tc.want)
 			}
 		})

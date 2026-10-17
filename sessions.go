@@ -44,10 +44,13 @@ type SessionForkSource struct {
 
 // SessionMessageList is one page of a session's messages, newest page first.
 type SessionMessageList struct {
-	Data       []Message `json:"data"`
-	NextCursor string    `json:"nextCursor"` // older messages; "" on the last page
-	// LatestCursor marks the newest message. Save it and pass it as After to poll for new
-	// messages; nil when the session has none.
+	Data []Message `json:"data"`
+	// NextCursor is the next page in the same direction: older messages for a Cursor walk,
+	// newer ones for an After poll; "" on the last page.
+	NextCursor string `json:"nextCursor"`
+	// LatestCursor is the cursor of the newest message on this page. Save it from the first
+	// page (no Cursor) or from an After page, and pass it as After to poll for new messages.
+	// It is nil when this page is empty; keep the cursor you saved before.
 	LatestCursor *string `json:"latestCursor"`
 }
 
@@ -150,7 +153,7 @@ type ForkSessionParams struct {
 
 // ListSessionMessagesParams pages listSessionMessages; set Cursor or After, not both.
 type ListSessionMessagesParams struct {
-	After  *string `json:"-" query:"after"`  // a saved LatestCursor: messages added after it
+	After  *string `json:"-" query:"after"`  // a LatestCursor saved from the first page or an After page: messages added after it
 	Cursor *string `json:"-" query:"cursor"` // a NextCursor: older messages
 	Limit  *int    `json:"-" query:"limit"`
 }
