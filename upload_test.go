@@ -6,11 +6,14 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	ba "github.com/blazingagents/golang-sdk"
 	"github.com/blazingagents/golang-sdk/internal/op"
@@ -63,7 +66,6 @@ func TestUploads(t *testing.T) {
 		{ba.UploadBytes("notes.weird", []byte("w")), testkit.Part{Name: "file", Filename: "notes.weird", ContentType: "application/octet-stream", Data: []byte("w")}},
 		{ba.UploadBytes("noext", nil), testkit.Part{Name: "file", Filename: "noext", ContentType: "application/octet-stream", Data: []byte{}}},
 		{ba.UploadBytes("a.png", []byte("x")).WithContentType("image/avif"), testkit.Part{Name: "file", Filename: "a.png", ContentType: "image/avif", Data: []byte("x")}},
-		{ba.UploadBytes(`we"ird.jpg`, []byte("j")), testkit.Part{Name: "file", Filename: `we"ird.jpg`, ContentType: "image/jpeg", Data: []byte("j")}},
 	} {
 		if err := uploadAvatar(t, m, tc.up, tc.want); err != nil {
 			t.Errorf("%s: %v", tc.want.Filename, err)
@@ -157,5 +159,62 @@ func TestDownload(t *testing.T) {
 	m.Expect(testkit.Exchange{Op: "getSkillFile", Path: path, Query: q, Status: 404, RespBody: `{"error":{"code":"skill_not_found","message":"No skill"}}`})
 	if _, err := c.Skills.ReadFile(ctx, agent, skill, "a.md"); err == nil || err.Error() != "blazingagents: getSkillFile: 404 skill_not_found: No skill" {
 		t.Fatalf("API error: %v", err)
+	}
+}
+
+type uploadEndless struct {
+	reads  atomic.Int64
+	closed chan struct{}
+}
+
+func (r *uploadEndless) Read(p []byte) (int, error) {
+	r.reads.Add(1)
+	return len(p), nil
+}
+
+func (r *uploadEndless) Close() error {
+	close(r.closed)
+	return nil
+}
+
+// A server that answers before reading the body ends the upload: the source stops being
+// read and is closed.
+func TestUploadStopsAfterAnEarlyResponse(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Connection", "close")
+		w.WriteHeader(http.StatusRequestEntityTooLarge)
+		io.WriteString(w, `{"error":{"code":"invalid_request","message":"too big"}}`)
+	}))
+	defer srv.Close()
+	c, err := ba.NewClient(ba.WithAPIKey(testkit.APIKey), ba.WithBaseURL(srv.URL))
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := &uploadEndless{closed: make(chan struct{})}
+	_, err = c.Agents.UploadAvatar(context.Background(), "a", ba.UploadReader("a.png", src))
+	if err == nil || err.Error() != "blazingagents: uploadAgentAvatar: 413 invalid_request: too big" {
+		t.Fatalf("error %v", err)
+	}
+	select {
+	case <-src.closed:
+	case <-time.After(5 * time.Second):
+		t.Fatalf("the source is still being read (%d reads) and was never closed", src.reads.Load())
+	}
+}
+
+// The part header is the one browsers and Node's FormData write, which the API's WHATWG
+// multipart parser reads: name first, quotes and line breaks percent-encoded, UTF-8 raw.
+func TestUploadPartHeader(t *testing.T) {
+	m := testkit.New(t)
+	for _, tc := range []struct{ name, disposition, contentType string }{
+		{`we"ird.png`, `form-data; name="file"; filename="we%22ird.png"`, "image/png"},
+		{`x\y.png`, `form-data; name="file"; filename="x\y.png"`, "image/png"},
+		{"résumé.png", `form-data; name="file"; filename="résumé.png"`, "image/png"},
+		{"line\r\nbreak.md", `form-data; name="file"; filename="line%0D%0Abreak.md"`, "text/markdown"},
+	} {
+		want := testkit.Part{Name: "file", Disposition: tc.disposition, ContentType: tc.contentType, Data: []byte("x")}
+		if err := uploadAvatar(t, m, ba.UploadBytes(tc.name, []byte("x")), want); err != nil {
+			t.Errorf("%q: %v", tc.name, err)
+		}
 	}
 }

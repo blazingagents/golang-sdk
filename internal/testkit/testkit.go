@@ -56,9 +56,12 @@ type Exchange struct {
 	Interval   time.Duration // wait before each SSE chunk
 }
 
-// Part is one expected multipart part.
+// Part is one expected multipart part. When Disposition is set, the part's raw
+// Content-Disposition must equal it, and Filename is not compared: Go's parser reads quoted
+// filenames differently from the API's WHATWG parser.
 type Part struct {
 	Name, Filename, ContentType string
+	Disposition                 string
 	Data                        []byte
 }
 
@@ -230,7 +233,11 @@ func checkMultipart(ct string, body []byte, want []Part) []string {
 			return []string{"multipart: " + err.Error()}
 		}
 		data, _ := io.ReadAll(part)
-		got = append(got, Part{Name: part.FormName(), Filename: part.FileName(), ContentType: part.Header.Get("Content-Type"), Data: data})
+		p := Part{Name: part.FormName(), Filename: part.FileName(), ContentType: part.Header.Get("Content-Type"), Data: data}
+		if i := len(got); i < len(want) && want[i].Disposition != "" {
+			p.Filename, p.Disposition = "", part.Header.Get("Content-Disposition")
+		}
+		got = append(got, p)
 	}
 	if !reflect.DeepEqual(got, want) {
 		return []string{fmt.Sprintf("multipart parts %+v, want %+v", got, want)}

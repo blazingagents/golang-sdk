@@ -2,9 +2,7 @@ package blazingagents
 
 import (
 	"bytes"
-	"cmp"
 	"io"
-	"mime"
 	"mime/multipart"
 	"net/textproto"
 	"os"
@@ -88,36 +86,35 @@ func encodeMultipart(p multipartParams) (io.Reader, string, []string, error) {
 	if err != nil {
 		return nil, "", nil, &ArgumentError{Name: "file", Reason: err.Error(), Err: err}
 	}
-	name := cmp.Or(p.file.name, p.defaultName)
+	name := p.file.name
+	if name == "" {
+		name = p.defaultName
+	}
 	pr, pw := io.Pipe()
-	sw := &stickyWriter{w: pw}
-	mw := multipart.NewWriter(sw)
+	mw := multipart.NewWriter(pw)
 	go func() {
+		// Once net/http closes the body (the server answered early), every write fails, so a
+		// failed field write resurfaces in CreatePart and the copy stops at its first write.
 		for _, f := range p.fields {
 			_ = mw.WriteField(f[0], f[1])
 		}
 		h := textproto.MIMEHeader{}
-		h.Set("Content-Disposition", mime.FormatMediaType("form-data", map[string]string{"name": "file", "filename": name}))
+		h.Set("Content-Disposition", `form-data; name="file"; filename="`+filenameEscaper.Replace(name)+`"`)
 		h.Set("Content-Type", p.file.partContentType(name))
-		part, _ := mw.CreatePart(h)
-		_, err := io.Copy(part, rc)
+		part, err := mw.CreatePart(h)
+		if err == nil {
+			_, err = io.Copy(part, rc)
+		}
 		rc.Close() // before the body ends, so the reader is closed once the request is sent
-		_ = mw.Close()
-		pw.CloseWithError(cmp.Or(err, sw.err))
+		if err == nil {
+			err = mw.Close()
+		}
+		pw.CloseWithError(err)
 	}()
 	return pr, mw.FormDataContentType(), nil, nil
 }
 
-// stickyWriter keeps the first write error and swallows the rest, so the multipart writer
-// never fails mid-part; the error ends the pipe once the part is written.
-type stickyWriter struct {
-	w   io.Writer
-	err error
-}
-
-func (s *stickyWriter) Write(p []byte) (int, error) {
-	if s.err == nil {
-		_, s.err = s.w.Write(p)
-	}
-	return len(p), nil
-}
+// filenameEscaper encodes a part's filename the way browsers and Node's FormData do, which is
+// what the API's WHATWG multipart parser reads: quotes and line breaks percent-encoded,
+// everything else (backslashes, UTF-8) as is.
+var filenameEscaper = strings.NewReplacer(`"`, "%22", "\r", "%0D", "\n", "%0A")

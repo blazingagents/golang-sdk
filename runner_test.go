@@ -419,9 +419,10 @@ func TestRunnerEvents(t *testing.T) {
 		})
 	})
 	for name, frame := range map[string]string{
-		"not JSON":          "data: {data-ba-function-call\n\n",
-		"missing transient": `data: {"type":"data-ba-function-call","data":{"id":"x"}}` + "\n\n",
-		"bad deadline":      `data: {"type":"data-ba-function-call","transient":true,"data":{"name":"a","deadlineAt":"soon"}}` + "\n\n",
+		"not JSON":           "data: {data-ba-function-call\n\n",
+		"missing transient":  `data: {"type":"data-ba-function-call","data":{"id":"x"}}` + "\n\n",
+		"data not an object": `data: {"type":"data-ba-function-call","transient":true,"data":"x"}` + "\n\n",
+		"bad deadline":       `data: {"type":"data-ba-function-call","transient":true,"data":{"name":"a","deadlineAt":"soon"}}` + "\n\n",
 	} {
 		t.Run("malformed "+name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
@@ -469,6 +470,117 @@ func TestRunnerForwardsCallHeaders(t *testing.T) {
 		}
 		if meta.OperationID != "resumeSessionTurn" {
 			t.Fatalf("capture overwritten by %s", meta.OperationID)
+		}
+	})
+}
+
+// The cap is the server's: the serialized outcome {"kind":"output","value":...}, measured
+// without HTML escaping, is at most 256 KiB.
+func TestRunnerResultCapMeasuresTheOutcome(t *testing.T) {
+	const envelope = len(`{"kind":"output","value":}`)
+	for _, tc := range []struct {
+		name  string
+		value string
+		ok    bool
+	}{
+		{"at the limit", strings.Repeat("x", 256<<10-envelope-2), true},
+		{"one byte over", strings.Repeat("x", 256<<10-envelope-1), false},
+		{"HTML is not escaped", strings.Repeat("<b>", 30000), true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				r := newRunnerTurn(t)
+				r.turn(false, r.frame("lookup_order", `{}`, time.Now().Add(time.Minute)), runnerText)
+				r.claim(200, `{"claimed":true}`, nil)
+				want := `{"kind":"error","message":"Function returned an invalid result."}`
+				if tc.ok {
+					want = `{"kind":"output","value":` + jsonString(tc.value) + `}`
+				}
+				r.result(want, 200, `{"accepted":true}`)
+				fns := runnerFunctions(t, runnerLookup(func(context.Context, ba.FunctionCall, runnerOrder) (any, error) { return tc.value, nil }))
+				if _, err := runnerDrain(r.send(fns)); err != nil {
+					t.Fatal(err)
+				}
+			})
+		})
+	}
+}
+
+type runnerPanicMarshaler struct{}
+
+func (runnerPanicMarshaler) MarshalJSON() ([]byte, error) { panic("marshal bug") }
+
+// A panic in the result's MarshalJSON is recovered like a handler panic.
+func TestRunnerResultMarshalPanic(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := newRunnerTurn(t)
+		r.turn(false, r.frame("lookup_order", `{}`, time.Now().Add(time.Minute)), runnerText)
+		r.claim(200, `{"claimed":true}`, nil)
+		r.result(`{"kind":"error","message":"Function returned an invalid result."}`, 200, `{"accepted":true}`)
+		fns := runnerFunctions(t, runnerLookup(func(context.Context, ba.FunctionCall, runnerOrder) (any, error) { return runnerPanicMarshaler{}, nil }))
+		if _, err := runnerDrain(r.send(fns)); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
+// A claim the server accepts after the deadline does not run the handler.
+func TestRunnerNoHandlerAfterALateClaim(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := newRunnerTurn(t)
+		r.turnEvery(time.Second, false, r.frame("lookup_order", `{}`, time.Now().Add(2*time.Second)), runnerText, runnerText, runnerText)
+		r.m.Expect(testkit.Exchange{Op: "claimChatFunctionCall", Path: r.callPath("claim"), Delay: 2 * time.Second, RespBody: `{"claimed":true}`,
+			BodyFunc: func([]byte) error { return nil }})
+		ran := make(chan struct{}, 1)
+		fns := runnerFunctions(t, runnerLookup(func(context.Context, ba.FunctionCall, runnerOrder) (any, error) {
+			ran <- struct{}{}
+			return "charged the card", nil
+		}))
+		if _, err := runnerDrain(r.send(fns)); err != nil {
+			t.Fatal(err)
+		}
+		synctest.Wait()
+		select {
+		case <-ran:
+			t.Fatal("the handler ran for a claim accepted after its deadline")
+		default:
+		}
+	})
+}
+
+// Interception reads the type before anything else: another event that mentions the
+// function-call type, with a data field of any shape, passes through.
+func TestRunnerInterceptChecksTheTypeFirst(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := newRunnerTurn(t)
+		ev := "data: {\"type\":\"data-note\",\"data\":\"see data-ba-function-call\"}\n\n"
+		r.turn(false, ev)
+		if events, err := runnerDrain(r.send(runnerFunctions(t, runnerLookup(nil)))); err != nil || len(events) != 1 || events[0] != ev {
+			t.Fatalf("events %q, %v", events, err)
+		}
+	})
+}
+
+// Retry-After: 0 means "retry now", which the runner floors at 250 ms instead of backing off.
+func TestRunnerRetryAfterZero(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := newRunnerTurn(t)
+		start := time.Now()
+		r.turnEvery(30*time.Second, false, r.frame("lookup_order", `{}`, start.Add(time.Minute)), runnerText)
+		r.claim(503, `{}`, http.Header{"Retry-After": {"0"}})
+		r.claim(503, `{}`, http.Header{"Retry-After": {"0"}})
+		r.claim(200, `{"claimed":true}`, nil)
+		r.result(`{"kind":"output","value":1}`, 200, `{"accepted":true}`)
+		claimed := make(chan time.Time, 1)
+		fns := runnerFunctions(t, runnerLookup(func(context.Context, ba.FunctionCall, runnerOrder) (any, error) {
+			claimed <- time.Now()
+			return 1, nil
+		}))
+		if _, err := runnerDrain(r.send(fns)); err != nil {
+			t.Fatal(err)
+		}
+		if got := (<-claimed).Sub(start); got != 30*time.Second+500*time.Millisecond {
+			t.Fatalf("claimed after %s, want 30.5s (two 250 ms waits)", got)
 		}
 	})
 }

@@ -97,12 +97,18 @@ func (r *runner) intercept(ev []byte) (bool, error) {
 	if !bytes.Contains(data, []byte(functionCallEvent)) {
 		return false, nil
 	}
+	// The type decides first, so another event that only mentions the type passes through
+	// whatever the shape of its other fields.
+	var v any
+	if err := json.Unmarshal(data, &v); err != nil {
+		return false, err
+	}
+	if m, _ := v.(map[string]any); m["type"] != functionCallEvent {
+		return false, nil
+	}
 	var f functionCallFrame
 	if err := json.Unmarshal(data, &f); err != nil {
 		return false, err
-	}
-	if f.Type != functionCallEvent {
-		return false, nil
 	}
 	deadline, err := time.Parse(time.RFC3339Nano, f.Data.DeadlineAt)
 	if err != nil || !f.Transient || f.Data.Name == nil || !functionCallIDPattern.MatchString(string(f.Data.ID)) {
@@ -145,6 +151,9 @@ func (r *runner) run(call FunctionCall, input json.RawMessage) {
 	if ok := r.post(claim, map[string]string{"claimRequestId": claimID}, "claimed", call.Deadline); !ok {
 		return
 	}
+	if r.ctx.Err() != nil || !time.Now().Before(call.Deadline) {
+		return // claimed too late: the server no longer waits, so the handler must not run
+	}
 	ctx, cancel := context.WithDeadline(r.ctx, call.Deadline)
 	defer cancel()
 	out := r.execute(ctx, call, input)
@@ -163,26 +172,26 @@ func (r *runner) execute(ctx context.Context, call FunctionCall, input json.RawM
 	if !ok {
 		return errorOutcome("Function " + call.Name + " is not available.")
 	}
-	value, msg := invoke(ctx, def.handler, call, input)
+	data, msg := invoke(ctx, def.handler, call, input)
 	if msg != "" {
 		r.t.logger.LogAttrs(ctx, slog.LevelDebug, "blazingagents function failed",
 			slog.String("function", call.Name), slog.String("callId", string(call.ID)), slog.String("outcome", msg))
 		return errorOutcome(msg)
 	}
-	data, err := json.Marshal(value)
-	if err != nil || len(data) > maxResultSize {
-		r.t.logger.LogAttrs(ctx, slog.LevelDebug, "blazingagents function result rejected",
-			slog.String("function", call.Name), slog.String("callId", string(call.ID)), slog.Int("bytes", len(data)))
-		return errorOutcome(msgInvalidResult)
-	}
 	return outcome{Kind: "output", Value: data}
 }
 
-// invoke runs a handler, turning an error or a panic into its sanitized message.
-func invoke(ctx context.Context, h handlerFunc, call FunctionCall, input json.RawMessage) (value any, msg string) {
+// outcomeEnvelope is what an output outcome adds around its value. The server caps the
+// whole outcome, measured as JSON.stringify writes it.
+const outcomeEnvelope = len(`{"kind":"output","value":}`)
+
+// invoke runs a handler and encodes its result, turning an error, a panic (in the handler or
+// in the result's MarshalJSON) or a result over the cap into its sanitized message.
+func invoke(ctx context.Context, h handlerFunc, call FunctionCall, input json.RawMessage) (data []byte, msg string) {
+	onPanic := msgExecution
 	defer func() {
 		if p := recover(); p != nil {
-			value, msg = nil, msgExecution
+			data, msg = nil, onPanic
 		}
 	}()
 	v, err := h(ctx, call, input)
@@ -192,7 +201,14 @@ func invoke(ctx context.Context, h handlerFunc, call FunctionCall, input json.Ra
 	case err != nil:
 		return nil, msgExecution
 	}
-	return v, ""
+	onPanic = msgInvalidResult
+	var b bytes.Buffer
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false) // JSON.stringify does not escape <, > and &
+	if err := enc.Encode(v); err != nil || b.Len()-1+outcomeEnvelope > maxResultSize {
+		return nil, msgInvalidResult
+	}
+	return bytes.TrimSuffix(b.Bytes(), []byte("\n")), ""
 }
 
 // post sends a claim or a result until the server accepts it, retrying transient failures
@@ -249,8 +265,8 @@ func retryDelay(err error, attempt int) (time.Duration, bool) {
 		if s := apiErr.Status; s < 500 && s != 408 && s != 429 {
 			return 0, false
 		}
-		if apiErr.RetryAfter > 0 {
-			return max(apiErr.RetryAfter, firstRetryDelay), true
+		if d, ok := retryAfter(apiErr.Meta.Header.Get("Retry-After")); ok {
+			return max(d, firstRetryDelay), true // 0 or a past date retries after the floor
 		}
 	}
 	return min(firstRetryDelay<<min(attempt, 4), maxRetryDelay), true

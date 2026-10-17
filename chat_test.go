@@ -366,3 +366,13 @@ func TestUserMessageJSON(t *testing.T) {
 		}
 	}
 }
+
+// A Functions value not built by NewFunctions is an argument error, not a panic.
+func TestChatZeroFunctions(t *testing.T) {
+	ids := newChatIDs()
+	m := testkit.New(t)
+	_, err := m.Client().Chat.Send(context.Background(), ids.agent, chatInput(), ba.ChatParams{Functions: &ba.Functions{}})
+	if err == nil || err.Error() != "blazingagents: invalid argument params.Functions: not built by NewFunctions" {
+		t.Fatalf("error %v", err)
+	}
+}

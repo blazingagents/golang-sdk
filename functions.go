@@ -70,7 +70,7 @@ type functionDefinition struct {
 }
 
 func (f *Functions) defs() functionDefs {
-	if f == nil {
+	if f == nil || f.f == nil {
 		return nil
 	}
 	return f.f.defs

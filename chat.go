@@ -125,6 +125,9 @@ var (
 )
 
 func (s *ChatService) start(ctx context.Context, r op.UserScoped, agentID AgentID, sessionID SessionID, b any, fns *Functions, opts []RequestOption) (*ChatStream, error) {
+	if fns != nil && fns.f == nil {
+		return nil, &ArgumentError{Name: "params.Functions", Reason: "not built by NewFunctions"}
+	}
 	resp, c, err := s.s.open(ctx, r, b, opts)
 	if err != nil {
 		return nil, err

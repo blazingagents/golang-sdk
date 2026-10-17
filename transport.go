@@ -266,7 +266,8 @@ func (c *call) apiError(resp *http.Response) error {
 	if err != nil {
 		return c.connectionError(err)
 	}
-	e := &APIError{Status: resp.StatusCode, Meta: c.meta, RetryAfter: retryAfter(resp.Header.Get("Retry-After"))}
+	e := &APIError{Status: resp.StatusCode, Meta: c.meta}
+	e.RetryAfter, _ = retryAfter(resp.Header.Get("Retry-After"))
 	if len(data) > maxErrorBody {
 		data, e.BodyTruncated = data[:maxErrorBody], true
 	}
@@ -289,17 +290,15 @@ func (c *call) apiError(resp *http.Response) error {
 	return e
 }
 
-func retryAfter(v string) time.Duration {
-	if v == "" {
-		return 0
-	}
+// retryAfter parses delta-seconds or an HTTP-date, reporting whether v is either.
+func retryAfter(v string) (time.Duration, bool) {
 	if n, err := strconv.Atoi(v); err == nil {
-		return max(time.Duration(n)*time.Second, 0)
+		return max(time.Duration(n)*time.Second, 0), true
 	}
 	if t, err := http.ParseTime(v); err == nil {
-		return max(time.Until(t), 0)
+		return max(time.Until(t), 0), true
 	}
-	return 0
+	return 0, false
 }
 
 // redactString hides each secret: anywhere when it is 8 bytes or longer, else only as the whole value.
