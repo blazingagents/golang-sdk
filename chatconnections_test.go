@@ -162,6 +162,14 @@ func TestChatConnections(t *testing.T) {
 			Err:  "blazingagents: invalid argument params: nil",
 		},
 		{
+			Name: "createChatConnection typed nil pointer",
+			Call: func(ctx context.Context, c *ba.Client) (any, error) {
+				var spec *ba.SlackConnection
+				return c.ChatConnections.Create(ctx, spec)
+			},
+			Err: "blazingagents: invalid argument params: nil",
+		},
+		{
 			Name: "getChatConnection", Exchanges: get(example), Call: getCall, Example: example,
 			Check: func(t *testing.T, got any) {
 				testkit.CoversExample(t, example, got)
@@ -232,6 +240,14 @@ func TestChatConnections(t *testing.T) {
 			Name: "rotateChatCredentials nil",
 			Call: func(ctx context.Context, c *ba.Client) (any, error) {
 				return c.ChatConnections.RotateCredentials(ctx, conn, nil)
+			},
+			Err: "blazingagents: invalid argument params: nil",
+		},
+		{
+			Name: "rotateChatCredentials typed nil pointer",
+			Call: func(ctx context.Context, c *ba.Client) (any, error) {
+				var creds *ba.TelegramCredentials
+				return c.ChatConnections.RotateCredentials(ctx, conn, creds)
 			},
 			Err: "blazingagents: invalid argument params: nil",
 		},
