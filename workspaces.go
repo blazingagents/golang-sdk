@@ -4,6 +4,7 @@ import (
 	"context"
 	"iter"
 	"net/http"
+	"time"
 
 	"github.com/blazingagents/golang-sdk/internal/op"
 )
@@ -11,7 +12,14 @@ import (
 // Workspace is a sandbox agents run in.
 type Workspace struct {
 	ID            WorkspaceID   `json:"id"`
+	TenantID      TenantID      `json:"tenantId"`
+	Tier          WorkspaceTier `json:"tier"`
+	Name          *string       `json:"name"`
+	UserID        string        `json:"userId"`
+	Metadata      Metadata      `json:"metadata"`
 	NetworkPolicy NetworkPolicy `json:"networkPolicy"`
+	CreatedAt     time.Time     `json:"createdAt"`
+	UpdatedAt     time.Time     `json:"updatedAt"`
 }
 
 // WorkspaceDeletion is how deleteWorkspace ended: WorkspaceDeletionPending or WorkspaceDeletionCompleted.
@@ -42,19 +50,19 @@ type CreateWorkspaceParams struct {
 	NetworkPolicy NetworkPolicy  `json:"networkPolicy,omitzero"`
 }
 
-// UpdateWorkspaceParams is the body of updateWorkspace.
+// UpdateWorkspaceParams is the body of updateWorkspace. An omitted field is left unchanged.
 type UpdateWorkspaceParams struct {
-	Name          Nullable[string] `json:"name,omitzero"`
+	Name          Nullable[string] `json:"name,omitzero"` // Null clears the name
 	Metadata      Metadata         `json:"metadata,omitzero"`
 	NetworkPolicy NetworkPolicy    `json:"networkPolicy,omitzero"`
 }
 
-// List is listWorkspaces.
+// List is listWorkspaces: https://docs.blazingagents.com/api-reference/rest-api/workspaces#list-workspaces.
 func (s *WorkspacesService) List(ctx context.Context, params ListWorkspacesParams, opts ...RequestOption) (*Page[Workspace], error) {
 	return decode[Page[Workspace]](s.s.send(ctx, op.ListWorkspaces(), params, opts))
 }
 
-// All iterates listWorkspaces across pages.
+// All iterates listWorkspaces across pages, starting at params.Cursor.
 func (s *WorkspacesService) All(ctx context.Context, params ListWorkspacesParams, opts ...RequestOption) iter.Seq2[Workspace, error] {
 	return all(ctx, "", func(ctx context.Context, cursor string) (*Page[Workspace], error) {
 		p := params
@@ -65,22 +73,23 @@ func (s *WorkspacesService) All(ctx context.Context, params ListWorkspacesParams
 	})
 }
 
-// Create is createWorkspace.
+// Create is createWorkspace: https://docs.blazingagents.com/api-reference/rest-api/workspaces#create-workspace.
 func (s *WorkspacesService) Create(ctx context.Context, params CreateWorkspaceParams, opts ...RequestOption) (*Workspace, error) {
 	return decode[Workspace](s.s.send(ctx, op.CreateWorkspace(), params, opts))
 }
 
-// Get is getWorkspace.
+// Get is getWorkspace: https://docs.blazingagents.com/api-reference/rest-api/workspaces#get-workspace.
 func (s *WorkspacesService) Get(ctx context.Context, workspaceID WorkspaceID, opts ...RequestOption) (*Workspace, error) {
 	return decode[Workspace](s.s.send(ctx, op.GetWorkspace(string(workspaceID)), nil, opts))
 }
 
-// Update is updateWorkspace.
+// Update is updateWorkspace: https://docs.blazingagents.com/api-reference/rest-api/workspaces#update-workspace.
 func (s *WorkspacesService) Update(ctx context.Context, workspaceID WorkspaceID, params UpdateWorkspaceParams, opts ...RequestOption) (*Workspace, error) {
 	return decode[Workspace](s.s.send(ctx, op.UpdateWorkspace(string(workspaceID)), params, opts))
 }
 
-// Delete is deleteWorkspace: WorkspaceDeletionPending on 202, WorkspaceDeletionCompleted on any other 2xx.
+// Delete is deleteWorkspace: https://docs.blazingagents.com/api-reference/rest-api/workspaces#delete-workspace.
+// It returns WorkspaceDeletionPending on 202 and WorkspaceDeletionCompleted on any other 2xx.
 func (s *WorkspacesService) Delete(ctx context.Context, workspaceID WorkspaceID, opts ...RequestOption) (WorkspaceDeletion, error) {
 	b, err := s.s.send(ctx, op.DeleteWorkspace(string(workspaceID)), nil, opts)
 	switch {
