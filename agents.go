@@ -58,8 +58,8 @@ type CreateAgentParams struct {
 	ApprovalInChat  *ApprovalPolicy `json:"approvalInChat,omitzero"`
 	ApprovalInTasks *ApprovalPolicy `json:"approvalInTasks,omitzero"`
 	Name            string          `json:"name"`
-	// ProviderID and Model are both omitted, both set, or both Null. ThinkingLevel needs a
-	// provider and a model.
+	// ProviderID and Model are both omitted, both set, or both Null. ThinkingLevel cannot be
+	// set while ProviderID is Null.
 	Model                   Nullable[string]     `json:"model,omitzero"`
 	ThinkingLevel           Nullable[string]     `json:"thinkingLevel,omitzero"`
 	ProviderID              Nullable[ProviderID] `json:"providerId,omitzero"`

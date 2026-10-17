@@ -386,6 +386,8 @@ func TestSkillsArguments(t *testing.T) {
 		{"empty skill ID", agentsErr(c.Skills.Get(ctx, agent, "")), `blazingagents: invalid argument skillId: "" is not a valid path segment`},
 		{"dot agent ID", agentsErr(c.Skills.List(ctx, ".", ba.ListSkillsParams{})), `blazingagents: invalid argument agentId: "." is not a valid path segment`},
 		{"nil content", agentsErr(c.Skills.ReplaceFile(ctx, agent, skill, "a.md", nil)), "blazingagents: invalid argument content: nil reader"},
+		{"nil AgentIDs", agentsErr(c.Skills.Copy(ctx, agent, skill, ba.CopySkillParams{})), "blazingagents: invalid argument params.AgentIDs: needs at least one agent"},
+		{"empty AgentIDs", agentsErr(c.Skills.Copy(ctx, agent, skill, ba.CopySkillParams{AgentIDs: []ba.AgentID{}})), "blazingagents: invalid argument params.AgentIDs: needs at least one agent"},
 		{"zero archive", agentsErr(c.Skills.Upload(ctx, agent, ba.UploadSkillParams{Type: ba.ArchiveTypeZip})), "blazingagents: invalid argument file: zero Upload"},
 	} {
 		var ae *ba.ArgumentError

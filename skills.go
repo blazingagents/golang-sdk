@@ -149,8 +149,11 @@ func (s *SkillsService) DeleteFile(ctx context.Context, agentID AgentID, skillID
 }
 
 // Copy copies a skill to other agents and reports each copy's outcome in order
-// (copySkill).
+// (copySkill). An empty params.AgentIDs is rejected before sending.
 // See https://docs.blazingagents.com/api-reference/rest-api/skills#copy-skill.
 func (s *SkillsService) Copy(ctx context.Context, agentID AgentID, skillID SkillID, params CopySkillParams, opts ...RequestOption) ([]SkillCopyResult, error) {
+	if len(params.AgentIDs) == 0 {
+		return nil, &ArgumentError{Name: "params.AgentIDs", Reason: "needs at least one agent"}
+	}
 	return decodeSkillCopyResults(s.s.send(ctx, op.CopySkill(string(agentID), string(skillID)), params, opts))
 }
