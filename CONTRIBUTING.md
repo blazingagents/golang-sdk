@@ -75,7 +75,7 @@ For each operation, test:
 
 ## Naming
 
-Every exported identifier a resource file adds starts with its resource noun (`TaskRunStatus`, `UsageTotals`, `SkillCopyError`), and every unexported helper or test helper starts with its file's noun (`agentsFixture`). Enum constants use Go initialisms (`ProviderTypeOpenRouter`, `TaskRunStatusQueued`).
+A params struct ends in `Params` and is usually named for its operation (`CreateAgentParams`, `ListSessionMessagesParams`); a few follow their method instead (`ChatParams`, `UsageParams`). A model usually carries its spec component name with Go initialisms (`McpAttachment` is `MCPAttachment`). A model the spec leaves inline is named for its resource (`UsageTotals`, `SkillCopyError`). A test helper starts with its file's noun (`agentsCovers`, `sessionsErr`). Enum constants use Go initialisms (`ProviderTypeOpenRouter`, `TaskRunStatusQueued`).
 
 ## Rules
 

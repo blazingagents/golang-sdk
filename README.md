@@ -26,7 +26,7 @@ the standard library and supports Go 1.26 and newer.
   Schemas derived from Go types.
 - `ForUser` clients that act for an end user and have no tenant
   administration methods.
-- Iterators over every list, uploads and streamed downloads.
+- Iterators over every paginated list, uploads and streamed downloads.
 - Per-call timeouts, headers and client request IDs, response observation,
   `log/slog` logging, and typed errors that never print a credential.
 
