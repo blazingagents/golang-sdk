@@ -86,20 +86,22 @@ A params struct ends in `Params` and is usually named for its operation (`Create
 
 A release is a git tag. The Go module proxy (`proxy.golang.org`) caches a tagged version's contents the first time anyone fetches it, and `sum.golang.org` records its checksum. Deleting or moving the tag afterwards does not change what users download, and retagging different contents makes their builds fail checksum verification. Treat a pushed tag as permanent.
 
-1. In a PR, set `Version` in `client.go` to `X.Y.Z` (it goes into the User-Agent) and rename the `CHANGELOG.md` heading from `unreleased` to the release, or add a `## X.Y.Z` entry. A release that deprecates or removes something shows the migration, as `AGENTS.md` requires.
-2. After the PR merges and CI on `main` is green, tag the merge commit and push the tag:
+1. In a PR, set `Version` in `client.go` to `X.Y.Z` (it goes into the User-Agent) and rename the `CHANGELOG.md` heading from `unreleased` to the release, or add a `## X.Y.Z` entry. A release that deprecates or removes something shows the migration, as `AGENTS.md` requires. A version with a suffix, such as `X.Y.Z-rc.1`, becomes a prerelease.
+2. After the PR merges and CI on `main` is green, run the Release workflow by hand on `main` (Actions > Release > Run workflow). This is a dry run: it runs the gate and the checks below against `main` and shows the release notes in the run summary, but creates nothing.
+3. Tag the merge commit and push the tag:
 
    ```sh
    git tag -a vX.Y.Z -m "vX.Y.Z" <merge-commit>
    git push origin vX.Y.Z
    ```
 
-3. Ask the proxy for the version so pkg.go.dev lists it:
+The tag push is the release, and it is the irreversible step. The Release workflow (`.github/workflows/release.yml`) runs on it, but it cannot undo or block the tag: anyone can fetch the tagged version from the proxy as soon as it is pushed. The workflow:
 
-   ```sh
-   GOPROXY=https://proxy.golang.org go list -m github.com/blazingagents/golang-sdk@vX.Y.Z
-   ```
+1. Reruns the gate (`ci.yml`).
+2. Runs `.github/scripts/release-check.sh`, which checks that the tag matches `Version` in `client.go`, that the tagged commit is on `main`, and that `CHANGELOG.md` has a non-empty `## X.Y.Z` entry.
+3. Creates the GitHub release with that entry as its body, marked as a prerelease for a suffixed tag.
+4. Asks `proxy.golang.org` for the version so pkg.go.dev lists it.
 
-4. Publish a GitHub release from the tag with the changelog entry.
+A failed check means only that the GitHub release was not created. The tag is still public. Fix the cause in a new version rather than moving the tag. If the proxy step fails, rerun the job: the release step skips a release that already exists. To check the script by hand, run `.github/scripts/release-check.sh vX.Y.Z /tmp/notes.md` from the repository root.
 
 A bad release is not deleted. Fix it in a new version, and add a `retract vX.Y.Z` directive with a reason to `go.mod` in that version. The module stays at v0 until its API is stable. A v2 or later needs the `/v2` module path suffix.
