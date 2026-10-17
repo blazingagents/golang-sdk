@@ -167,9 +167,9 @@ func (s *TasksService) All(ctx context.Context, params ListTasksParams, opts ...
 }
 
 // Create creates a task (createTask).
-// See https://docs.blazingagents.com/api-reference/rest-api/tasks#create-task.
 // With Submit set the server answers 202 and CreatedTask.RunID names the first run; both
 // 201 and 202 decode.
+// See https://docs.blazingagents.com/api-reference/rest-api/tasks#create-task.
 func (s *TasksService) Create(ctx context.Context, params CreateTaskParams, opts ...RequestOption) (*CreatedTask, error) {
 	return decode[CreatedTask](s.s.send(ctx, op.CreateTask(), params, opts))
 }

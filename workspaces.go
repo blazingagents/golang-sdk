@@ -95,8 +95,8 @@ func (s *WorkspacesService) Update(ctx context.Context, workspaceID WorkspaceID,
 }
 
 // Delete deletes a workspace (deleteWorkspace).
-// See https://docs.blazingagents.com/api-reference/rest-api/workspaces#delete-workspace.
 // It returns WorkspaceDeletionPending on 202 and WorkspaceDeletionCompleted on any other 2xx.
+// See https://docs.blazingagents.com/api-reference/rest-api/workspaces#delete-workspace.
 func (s *WorkspacesService) Delete(ctx context.Context, workspaceID WorkspaceID, opts ...RequestOption) (WorkspaceDeletion, error) {
 	b, err := s.s.send(ctx, op.DeleteWorkspace(string(workspaceID)), nil, opts)
 	switch {
