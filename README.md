@@ -72,75 +72,11 @@ Run any of them with
 `BLAZING_AGENTS_API_KEY=... BLAZING_AGENTS_AGENT_ID=ag_... go run ./examples/quickstart`.
 `chat_relay` also needs `DEMO_USER_TOKEN`, the bearer token the demo accepts.
 
-## Acting for an end user
-
-`client.ForUser(userID)` returns a `*ba.UserClient` that sends the end user's
-ID on every request. It shares the tenant client's connection pool and has
-only the services an end user may call, so a call to tenant administration
-such as `Providers` or `Tenant` does not compile.
-
-```go
-user, err := client.ForUser("user-123")
-if err != nil {
-	log.Fatal(err)
-}
-sessions, err := user.Sessions.List(ctx, agentID, ba.ListSessionsParams{})
-```
-
-## Relaying chat to `useChat`
-
-`Chat.Send` starts a turn and returns once the stream is open. `SetRelayHeaders`
-and `WriteTo` relay it to a browser's `useChat` transport, flushing after each
-event:
-
-```go
-func (a *app) chat(w http.ResponseWriter, r *http.Request) {
-	user, err := a.client.ForUser(signedInUserID(r))
-	if err != nil {
-		http.Error(w, "bad user", http.StatusInternalServerError)
-		return
-	}
-	stream, err := user.Chat.Send(r.Context(), agentID, ba.Messages(message), ba.ChatParams{SessionID: sessionID})
-	if err != nil {
-		http.Error(w, "the agent call failed", http.StatusBadGateway)
-		return
-	}
-	defer stream.Close()
-	stream.SetRelayHeaders(w.Header())
-	w.Header().Set("X-Session-Id", string(stream.SessionID()))
-	stream.WriteTo(w)
-}
-```
-
-[`examples/chat_relay`](examples/chat_relay) is a complete `net/http` server
-that accepts the default `DefaultChatTransport` body and handles regenerate.
-
-## Errors
-
-A failed API call returns `*ba.APIError`. Branch on its `Code`:
-
-```go
-_, err := client.Agents.Get(ctx, agentID)
-var apiErr *ba.APIError
-switch {
-case errors.As(err, &apiErr) && apiErr.Code == ba.ErrorCodeNotFound:
-	fmt.Println("no such agent; request", apiErr.Meta.RequestID)
-case errors.Is(err, context.DeadlineExceeded):
-	// the SDK's timeout or the caller's deadline
-case err != nil:
-	log.Fatal(err)
-}
-```
-
-The other errors are `*ba.TimeoutError`, `*ba.ConnectionError`,
-`*ba.StreamError`, `*ba.ObjectError`, `*ba.DecodeError`, `*ba.ArgumentError`
-and `*ba.CredentialEchoError`.
-
 ## Documentation
 
 Read the [Go SDK documentation](https://docs.blazingagents.com/sdk/go) for
-authentication, resource guides, chat and generation, error handling, and the
-API reference. The package reference is on
+authentication, clients that act for an end user, resource guides, chat relays
+and generation, error handling, and the API reference. The package reference is on
 [pkg.go.dev](https://pkg.go.dev/github.com/blazingagents/golang-sdk).
 
 The module is at v0 until its API is stable.

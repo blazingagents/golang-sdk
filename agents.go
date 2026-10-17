@@ -131,7 +131,7 @@ func (s *AgentsService) List(ctx context.Context, params ListAgentsParams, opts 
 // All iterates over every agent from params.Cursor on, fetching pages as needed (listAgents).
 // See https://docs.blazingagents.com/api-reference/rest-api/agents#list-agents.
 func (s *AgentsService) All(ctx context.Context, params ListAgentsParams, opts ...RequestOption) iter.Seq2[Agent, error] {
-	return all(ctx, "", func(ctx context.Context, cursor string) (*Page[Agent], error) {
+	return all(ctx, func(ctx context.Context, cursor string) (*Page[Agent], error) {
 		p := params
 		if cursor != "" {
 			p.Cursor = &cursor

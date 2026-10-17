@@ -314,7 +314,7 @@ func (s *ChatConnectionsService) ListDeliveries(ctx context.Context, connectionI
 // as needed (listChatDeliveries).
 // See https://docs.blazingagents.com/api-reference/rest-api/chat-connections#list-chat-deliveries.
 func (s *ChatConnectionsService) AllDeliveries(ctx context.Context, connectionID ChatConnectionID, params ListChatDeliveriesParams, opts ...RequestOption) iter.Seq2[ChatDelivery, error] {
-	return all(ctx, "", func(ctx context.Context, cursor string) (*Page[ChatDelivery], error) {
+	return all(ctx, func(ctx context.Context, cursor string) (*Page[ChatDelivery], error) {
 		p := params
 		if cursor != "" {
 			p.Cursor = &cursor
@@ -344,7 +344,7 @@ func (s *ChatDeliveriesService) List(ctx context.Context, params ListTenantChatD
 // (listTenantChatDeliveries).
 // See https://docs.blazingagents.com/api-reference/rest-api/chat-connections#list-tenant-chat-deliveries.
 func (s *ChatDeliveriesService) All(ctx context.Context, params ListTenantChatDeliveriesParams, opts ...RequestOption) iter.Seq2[TenantChatDelivery, error] {
-	return all(ctx, "", func(ctx context.Context, cursor string) (*Page[TenantChatDelivery], error) {
+	return all(ctx, func(ctx context.Context, cursor string) (*Page[TenantChatDelivery], error) {
 		p := params
 		if cursor != "" {
 			p.Cursor = &cursor

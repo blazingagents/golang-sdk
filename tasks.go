@@ -148,14 +148,16 @@ type ListTaskRunMessagesParams struct {
 	Limit  *int    `json:"-" query:"limit"`
 }
 
-// List is listTasks: https://docs.blazingagents.com/api-reference/rest-api/tasks#list-tasks.
+// List returns one page of tasks (listTasks).
+// See https://docs.blazingagents.com/api-reference/rest-api/tasks#list-tasks.
 func (s *TasksService) List(ctx context.Context, params ListTasksParams, opts ...RequestOption) (*Page[TaskListItem], error) {
 	return decode[Page[TaskListItem]](s.s.send(ctx, op.ListTasks(), params, opts))
 }
 
-// All iterates listTasks across pages, starting at params.Cursor.
+// All iterates over every task from params.Cursor on, fetching pages as needed (listTasks).
+// See https://docs.blazingagents.com/api-reference/rest-api/tasks#list-tasks.
 func (s *TasksService) All(ctx context.Context, params ListTasksParams, opts ...RequestOption) iter.Seq2[TaskListItem, error] {
-	return all(ctx, "", func(ctx context.Context, cursor string) (*Page[TaskListItem], error) {
+	return all(ctx, func(ctx context.Context, cursor string) (*Page[TaskListItem], error) {
 		p := params
 		if cursor != "" {
 			p.Cursor = &cursor
@@ -164,41 +166,49 @@ func (s *TasksService) All(ctx context.Context, params ListTasksParams, opts ...
 	})
 }
 
-// Create is createTask: https://docs.blazingagents.com/api-reference/rest-api/tasks#create-task.
+// Create creates a task (createTask).
 // With Submit set the server answers 202 and CreatedTask.RunID names the first run; both
 // 201 and 202 decode.
+// See https://docs.blazingagents.com/api-reference/rest-api/tasks#create-task.
 func (s *TasksService) Create(ctx context.Context, params CreateTaskParams, opts ...RequestOption) (*CreatedTask, error) {
 	return decode[CreatedTask](s.s.send(ctx, op.CreateTask(), params, opts))
 }
 
-// Get is getTask: https://docs.blazingagents.com/api-reference/rest-api/tasks#get-task.
+// Get returns a task (getTask).
+// See https://docs.blazingagents.com/api-reference/rest-api/tasks#get-task.
 func (s *TasksService) Get(ctx context.Context, taskID TaskID, opts ...RequestOption) (*Task, error) {
 	return decode[Task](s.s.send(ctx, op.GetTask(string(taskID)), nil, opts))
 }
 
-// Update is updateTask: https://docs.blazingagents.com/api-reference/rest-api/tasks#update-task.
+// Update changes a task (updateTask).
+// See https://docs.blazingagents.com/api-reference/rest-api/tasks#update-task.
 func (s *TasksService) Update(ctx context.Context, taskID TaskID, params UpdateTaskParams, opts ...RequestOption) (*Task, error) {
 	return decode[Task](s.s.send(ctx, op.UpdateTask(string(taskID)), params, opts))
 }
 
-// Delete is deleteTask: https://docs.blazingagents.com/api-reference/rest-api/tasks#delete-task.
+// Delete deletes a task (deleteTask).
+// See https://docs.blazingagents.com/api-reference/rest-api/tasks#delete-task.
 func (s *TasksService) Delete(ctx context.Context, taskID TaskID, opts ...RequestOption) error {
 	return empty(s.s.send(ctx, op.DeleteTask(string(taskID)), nil, opts))
 }
 
-// Submit is createTaskRun: https://docs.blazingagents.com/api-reference/rest-api/task-runs#create-task-run.
+// Submit queues a run of a task (createTaskRun).
+// See https://docs.blazingagents.com/api-reference/rest-api/task-runs#create-task-run.
 func (s *TasksService) Submit(ctx context.Context, taskID TaskID, params SubmitTaskParams, opts ...RequestOption) (*CreatedTaskRun, error) {
 	return decode[CreatedTaskRun](s.s.send(ctx, op.CreateTaskRun(string(taskID)), params, opts))
 }
 
-// ListRuns is listTaskRuns: https://docs.blazingagents.com/api-reference/rest-api/task-runs#list-task-runs.
+// ListRuns returns one page of a task's runs (listTaskRuns).
+// See https://docs.blazingagents.com/api-reference/rest-api/task-runs#list-task-runs.
 func (s *TasksService) ListRuns(ctx context.Context, taskID TaskID, params ListTaskRunsParams, opts ...RequestOption) (*Page[TaskRun], error) {
 	return decode[Page[TaskRun]](s.s.send(ctx, op.ListTaskRuns(string(taskID)), params, opts))
 }
 
-// AllRuns iterates listTaskRuns across pages, starting at params.Cursor.
+// AllRuns iterates over every run of a task from params.Cursor on, fetching pages as needed
+// (listTaskRuns).
+// See https://docs.blazingagents.com/api-reference/rest-api/task-runs#list-task-runs.
 func (s *TasksService) AllRuns(ctx context.Context, taskID TaskID, params ListTaskRunsParams, opts ...RequestOption) iter.Seq2[TaskRun, error] {
-	return all(ctx, "", func(ctx context.Context, cursor string) (*Page[TaskRun], error) {
+	return all(ctx, func(ctx context.Context, cursor string) (*Page[TaskRun], error) {
 		p := params
 		if cursor != "" {
 			p.Cursor = &cursor
@@ -207,13 +217,15 @@ func (s *TasksService) AllRuns(ctx context.Context, taskID TaskID, params ListTa
 	})
 }
 
-// GetRun is getTaskRun: https://docs.blazingagents.com/api-reference/rest-api/task-runs#get-task-run.
+// GetRun returns a task run (getTaskRun).
+// See https://docs.blazingagents.com/api-reference/rest-api/task-runs#get-task-run.
 func (s *TasksService) GetRun(ctx context.Context, taskID TaskID, runID TaskRunID, opts ...RequestOption) (*TaskRun, error) {
 	return decode[TaskRun](s.s.send(ctx, op.GetTaskRun(string(taskID), string(runID)), nil, opts))
 }
 
-// ListRunMessages is listTaskRunMessages: https://docs.blazingagents.com/api-reference/rest-api/task-runs#list-task-run-messages.
-// Setting both params.Cursor and params.After is an *ArgumentError.
+// ListRunMessages returns one page of a run's messages (listTaskRunMessages). Setting both
+// params.Cursor and params.After is an *ArgumentError.
+// See https://docs.blazingagents.com/api-reference/rest-api/task-runs#list-task-run-messages.
 func (s *TasksService) ListRunMessages(ctx context.Context, taskID TaskID, runID TaskRunID, params ListTaskRunMessagesParams, opts ...RequestOption) (*TaskRunMessageList, error) {
 	if params.Cursor != nil && params.After != nil {
 		return nil, &ArgumentError{Name: "params.Cursor", Reason: "set together with params.After; use one"}
@@ -221,10 +233,11 @@ func (s *TasksService) ListRunMessages(ctx context.Context, taskID TaskID, runID
 	return decode[TaskRunMessageList](s.s.send(ctx, op.ListTaskRunMessages(string(taskID), string(runID)), params, opts))
 }
 
-// AllRunMessages iterates listTaskRunMessages across pages, keeping the direction: with
-// After set, each next cursor goes into After, else into Cursor.
+// AllRunMessages iterates over a run's messages across pages, keeping the direction: with
+// After set, each next cursor goes into After, else into Cursor (listTaskRunMessages).
+// See https://docs.blazingagents.com/api-reference/rest-api/task-runs#list-task-run-messages.
 func (s *TasksService) AllRunMessages(ctx context.Context, taskID TaskID, runID TaskRunID, params ListTaskRunMessagesParams, opts ...RequestOption) iter.Seq2[Message, error] {
-	return all(ctx, "", func(ctx context.Context, cursor string) (*TaskRunMessageList, error) {
+	return all(ctx, func(ctx context.Context, cursor string) (*TaskRunMessageList, error) {
 		p := params
 		switch {
 		case cursor == "":
@@ -237,8 +250,9 @@ func (s *TasksService) AllRunMessages(ctx context.Context, taskID TaskID, runID 
 	})
 }
 
-// CancelRun is cancelTaskRun: https://docs.blazingagents.com/api-reference/rest-api/task-runs#cancel-task-run.
-// It returns once cancellation is requested; the run reaches canceled later.
+// CancelRun asks a run to stop (cancelTaskRun). It returns once cancellation is requested;
+// the run reaches canceled later.
+// See https://docs.blazingagents.com/api-reference/rest-api/task-runs#cancel-task-run.
 func (s *TasksService) CancelRun(ctx context.Context, taskID TaskID, runID TaskRunID, opts ...RequestOption) error {
 	return empty(s.s.send(ctx, op.CancelTaskRun(string(taskID), string(runID)), nil, opts))
 }

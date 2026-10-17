@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/blazingagents/golang-sdk/internal/op"
@@ -101,6 +102,28 @@ func (s userOps) open(ctx context.Context, r op.UserScoped, params any, opts []R
 		return nil, nil, err
 	}
 	return resp, c, nil
+}
+
+// streamBody is a response from open that its owner reads and then closes.
+type streamBody struct {
+	c      *call
+	resp   *http.Response
+	mu     sync.Mutex
+	closed bool
+}
+
+// close ends the request. It is safe from any goroutine and more than once.
+func (b *streamBody) close() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.closed {
+		return nil
+	}
+	b.closed = true
+	b.c.cancel(ErrStreamClosed)
+	err := b.resp.Body.Close()
+	b.c.done()
+	return err
 }
 
 func (t *transport) prepare(ctx context.Context, r op.Request, params any, opts []RequestOption) (*call, error) {
@@ -490,21 +513,11 @@ func unwrapOptional[T any](key string) func(*body, error) (*T, error) {
 // list decodes an unpaged list {"<key>": [T]}.
 func list[T any](key string) func(*body, error) ([]T, error) {
 	return func(b *body, err error) ([]T, error) {
-		if err != nil {
+		v, err := unwrapOptional[[]T](key)(b, err)
+		if v == nil {
 			return nil, err
 		}
-		var env map[string]json.RawMessage
-		if err := json.Unmarshal(b.data, &env); err != nil {
-			return nil, b.decodeError(err)
-		}
-		if absent(env[key]) {
-			return nil, nil
-		}
-		var v []T
-		if err := json.Unmarshal(env[key], &v); err != nil {
-			return nil, b.decodeError(err)
-		}
-		return v, nil
+		return *v, nil
 	}
 }
 

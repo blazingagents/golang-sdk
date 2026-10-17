@@ -6,9 +6,7 @@ import (
 	"errors"
 	"io"
 	"iter"
-	"net/http"
 	"strings"
-	"sync"
 	"unicode/utf8"
 
 	"github.com/blazingagents/golang-sdk/internal/op"
@@ -81,11 +79,12 @@ func (s *GenerationService) open(ctx context.Context, agentID AgentID, prompt Pr
 	if err != nil {
 		return nil, err
 	}
-	return &textStream{c: c, resp: resp}, nil
+	return &textStream{streamBody: streamBody{c: c, resp: resp}}, nil
 }
 
-// Completion generates text and returns all of it. It streams internally, so only the
-// response headers are bounded by the timeout.
+// Completion generates text and returns all of it (generate). It streams internally, so
+// only the response headers are bounded by the timeout.
+// See https://docs.blazingagents.com/api-reference/rest-api/generation#generate.
 func (s *GenerationService) Completion(ctx context.Context, agentID AgentID, prompt PromptInput, params GenerateParams, opts ...RequestOption) (string, error) {
 	ts, err := s.open(ctx, agentID, prompt, generateOutput{Type: "text"}, params.UserID, params.Metadata, opts)
 	if err != nil {
@@ -95,7 +94,9 @@ func (s *GenerationService) Completion(ctx context.Context, agentID AgentID, pro
 	return ts.all()
 }
 
-// CompletionStream generates text as a stream of deltas. Always defer stream.Close().
+// CompletionStream generates text as a stream of deltas (generate). Always defer
+// stream.Close().
+// See https://docs.blazingagents.com/api-reference/rest-api/generation#generate.
 func (s *GenerationService) CompletionStream(ctx context.Context, agentID AgentID, prompt PromptInput, params GenerateParams, opts ...RequestOption) (*CompletionStream, error) {
 	ts, err := s.open(ctx, agentID, prompt, generateOutput{Type: "text"}, params.UserID, params.Metadata, opts)
 	if err != nil {
@@ -116,8 +117,9 @@ func objectOutput[T any](schema ObjectSchema[T]) (generateOutput, error) {
 	return generateOutput{Type: "object", Schema: raw}, nil
 }
 
-// Object generates a T: the schema is params.Schema, or SchemaFor[T]() when it is zero.
-// Text that is not a T is an *ObjectError.
+// Object generates a T (generate): the schema is params.Schema, or SchemaFor[T]() when it
+// is zero. Text that is not a T is an *ObjectError.
+// See https://docs.blazingagents.com/api-reference/rest-api/generation#generate.
 func Object[T any](ctx context.Context, g *GenerationService, agentID AgentID, prompt PromptInput, params ObjectParams[T], opts ...RequestOption) (T, error) {
 	var zero T
 	out, err := objectOutput(params.Schema)
@@ -132,7 +134,9 @@ func Object[T any](ctx context.Context, g *GenerationService, agentID AgentID, p
 	return (&ObjectStream[T]{ts}).Object()
 }
 
-// StreamObject generates a T as a stream of raw JSON deltas. Always defer stream.Close().
+// StreamObject generates a T as a stream of raw JSON deltas (generate). Always defer
+// stream.Close().
+// See https://docs.blazingagents.com/api-reference/rest-api/generation#generate.
 func StreamObject[T any](ctx context.Context, g *GenerationService, agentID AgentID, prompt PromptInput, params ObjectParams[T], opts ...RequestOption) (*ObjectStream[T], error) {
 	out, err := objectOutput(params.Schema)
 	if err != nil {
@@ -202,14 +206,11 @@ func (s *ObjectStream[T]) Close() error { return s.s.close() }
 
 // textStream reads a text/plain body as UTF-8 deltas.
 type textStream struct {
-	c       *call
-	resp    *http.Response
+	streamBody
 	text    strings.Builder
 	pending []byte
 	err     error // io.EOF once the body ended cleanly, else the stream's failure
 	buf     [4 << 10]byte
-	mu      sync.Mutex
-	closed  bool
 }
 
 // read returns the next delta, or io.EOF at the end. Errors are sticky.
@@ -264,17 +265,4 @@ func (s *textStream) all() (string, error) {
 			return "", err
 		}
 	}
-}
-
-func (s *textStream) close() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.closed {
-		return nil
-	}
-	s.closed = true
-	s.c.cancel(ErrStreamClosed)
-	err := s.resp.Body.Close()
-	s.c.done()
-	return err
 }

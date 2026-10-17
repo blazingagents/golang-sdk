@@ -37,14 +37,17 @@ type ListArtifactsParams struct {
 	Cursor    *string    `json:"-" query:"cursor"`
 }
 
-// List is listArtifacts: https://docs.blazingagents.com/api-reference/rest-api/artifacts#list-artifacts.
+// List returns one page of artifacts (listArtifacts).
+// See https://docs.blazingagents.com/api-reference/rest-api/artifacts#list-artifacts.
 func (s *ArtifactsService) List(ctx context.Context, params ListArtifactsParams, opts ...RequestOption) (*Page[Artifact], error) {
 	return decode[Page[Artifact]](s.s.send(ctx, op.ListArtifacts(), params, opts))
 }
 
-// All iterates listArtifacts across pages, starting at params.Cursor.
+// All iterates over every artifact from params.Cursor on, fetching pages as needed
+// (listArtifacts).
+// See https://docs.blazingagents.com/api-reference/rest-api/artifacts#list-artifacts.
 func (s *ArtifactsService) All(ctx context.Context, params ListArtifactsParams, opts ...RequestOption) iter.Seq2[Artifact, error] {
-	return all(ctx, "", func(ctx context.Context, cursor string) (*Page[Artifact], error) {
+	return all(ctx, func(ctx context.Context, cursor string) (*Page[Artifact], error) {
 		p := params
 		if cursor != "" {
 			p.Cursor = &cursor
@@ -53,17 +56,21 @@ func (s *ArtifactsService) All(ctx context.Context, params ListArtifactsParams, 
 	})
 }
 
-// Get is getArtifact: https://docs.blazingagents.com/api-reference/rest-api/artifacts#get-artifact.
+// Get returns an artifact (getArtifact).
+// See https://docs.blazingagents.com/api-reference/rest-api/artifacts#get-artifact.
 func (s *ArtifactsService) Get(ctx context.Context, artifactID ArtifactID, opts ...RequestOption) (*Artifact, error) {
 	return decode[Artifact](s.s.send(ctx, op.GetArtifact(string(artifactID)), nil, opts))
 }
 
-// CreateDownloadURL is createArtifactDownloadUrl: https://docs.blazingagents.com/api-reference/rest-api/artifacts#create-artifact-download-url.
+// CreateDownloadURL returns a URL that downloads an artifact for five minutes
+// (createArtifactDownloadUrl).
+// See https://docs.blazingagents.com/api-reference/rest-api/artifacts#create-artifact-download-url.
 func (s *ArtifactsService) CreateDownloadURL(ctx context.Context, artifactID ArtifactID, opts ...RequestOption) (*ArtifactDownloadURL, error) {
 	return decode[ArtifactDownloadURL](s.s.send(ctx, op.CreateArtifactDownloadURL(string(artifactID)), nil, opts))
 }
 
-// Delete is deleteArtifact: https://docs.blazingagents.com/api-reference/rest-api/artifacts#delete-artifact.
+// Delete deletes an artifact (deleteArtifact).
+// See https://docs.blazingagents.com/api-reference/rest-api/artifacts#delete-artifact.
 func (s *ArtifactsService) Delete(ctx context.Context, artifactID ArtifactID, opts ...RequestOption) error {
 	return empty(s.s.send(ctx, op.DeleteArtifact(string(artifactID)), nil, opts))
 }
