@@ -33,7 +33,7 @@ the standard library and supports Go 1.26 and newer.
 ## Install
 
 ```sh
-go get github.com/blazingagents/golang-sdk
+go get github.com/blazingagents/golang-sdk@v0.1.0
 ```
 
 ## Quick start
