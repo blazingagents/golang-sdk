@@ -130,3 +130,18 @@ func TestUnionEdges(t *testing.T) {
 		}
 	}
 }
+
+// Generated enum constants spell initialisms and brand names as Go does.
+func TestEnumInitialisms(t *testing.T) {
+	for got, want := range map[string]string{
+		string(ba.MCPAuthTypeOAuthAuthorizationCode): "oauth_authorization_code",
+		string(ba.MCPAuthTypeOAuthClientCredentials): "oauth_client_credentials",
+		string(ba.ProviderTypeOpenRouter):            "openrouter",
+		string(ba.ProviderTypeVercelAIGateway):       "vercel_ai_gateway",
+		string(ba.ArchiveTypeTarGz):                  "tar.gz",
+	} {
+		if got != want {
+			t.Errorf("constant is %q, want %q", got, want)
+		}
+	}
+}

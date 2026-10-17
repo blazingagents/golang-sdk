@@ -701,8 +701,13 @@ func zeroJSON(v any) bool {
 		return v.String() == "0"
 	case []any:
 		return len(v) == 0
-	case map[string]any:
-		return len(v) == 0
+	case map[string]any: // a struct the example omits marshals as an object of zero values
+		for _, x := range v {
+			if !zeroJSON(x) {
+				return false
+			}
+		}
+		return true
 	}
 	return false
 }

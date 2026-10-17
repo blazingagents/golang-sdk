@@ -19,10 +19,14 @@ var (
 
 // encodeQueryAndHeaders reads the query:"name" and header:"Name" fields of params, including
 // those of an embedded *DateRange. A query field is sent only when the operation lists it, so
-// a name the operation takes in its body is left to the body.
+// a name the operation takes in its body is left to the body. It is the first to read params,
+// so it also rejects a typed nil behind a params interface ((*SlackConnection)(nil)).
 func encodeQueryAndHeaders(o *op.Operation, params any) (url.Values, http.Header, error) {
 	q, h := url.Values{}, http.Header{}
 	v := reflect.ValueOf(params)
+	if v.Kind() == reflect.Pointer && v.IsNil() {
+		return nil, nil, &ArgumentError{Name: "params", Reason: "nil"}
+	}
 	if v.Kind() != reflect.Struct {
 		return q, h, nil
 	}
