@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"iter"
-	"reflect"
 	"time"
 
 	"github.com/blazingagents/golang-sdk/internal/op"
@@ -21,8 +20,8 @@ type ChatConnection struct {
 	Platform           ChatPlatform      `json:"platform"`
 	Enabled            bool              `json:"enabled"`
 	Configuration      ChatConfiguration `json:"configuration"`
-	Identity           ChatIdentity      `json:"identity,omitzero"` // omitzero only affects re-encoding
-	Health             ChatHealth        `json:"health,omitzero"`
+	Identity           ChatIdentity      `json:"identity"`
+	Health             ChatHealth        `json:"health"`
 	CredentialFragment string            `json:"credentialFragment"`
 	CredentialVersion  int64             `json:"credentialVersion"`
 	CreatedAt          time.Time         `json:"createdAt"`
@@ -238,16 +237,6 @@ type ListTenantChatDeliveriesParams struct {
 
 var errNilParams = &ArgumentError{Name: "params", Reason: "nil"}
 
-// chatConnectionsNil reports a nil interface or a typed nil pointer: the variants have value
-// receivers, so a nil *SlackConnection satisfies the interface and would panic in wire().
-func chatConnectionsNil(v any) bool {
-	if v == nil {
-		return true
-	}
-	rv := reflect.ValueOf(v)
-	return rv.Kind() == reflect.Pointer && rv.IsNil()
-}
-
 // List returns every chat connection of the tenant (listChatConnections).
 // See https://docs.blazingagents.com/api-reference/rest-api/chat-connections#list-chat-connections.
 func (s *ChatConnectionsService) List(ctx context.Context, opts ...RequestOption) ([]ChatConnection, error) {
@@ -258,7 +247,7 @@ func (s *ChatConnectionsService) List(ctx context.Context, opts ...RequestOption
 // SlackConnection or a TelegramConnection, by value or pointer; nil is rejected.
 // See https://docs.blazingagents.com/api-reference/rest-api/chat-connections#create-chat-connection.
 func (s *ChatConnectionsService) Create(ctx context.Context, params ChatConnectionSpec, opts ...RequestOption) (*ChatConnection, error) {
-	if chatConnectionsNil(params) {
+	if params == nil { // a typed nil is rejected by the encoder
 		return nil, errNilParams
 	}
 	return decode[ChatConnection](s.s.send(ctx, op.CreateChatConnection(), params, opts))
@@ -308,7 +297,7 @@ func (s *ChatConnectionsService) CheckHealth(ctx context.Context, connectionID C
 // connection's platform; nil is rejected.
 // See https://docs.blazingagents.com/api-reference/rest-api/chat-connections#rotate-chat-credentials.
 func (s *ChatConnectionsService) RotateCredentials(ctx context.Context, connectionID ChatConnectionID, params ChatCredentials, opts ...RequestOption) (*ChatConnection, error) {
-	if chatConnectionsNil(params) {
+	if params == nil { // a typed nil is rejected by the encoder
 		return nil, errNilParams
 	}
 	return decode[ChatConnection](s.s.send(ctx, op.RotateChatCredentials(string(connectionID)), params, opts))
