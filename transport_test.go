@@ -144,7 +144,7 @@ func TestCredentialEcho(t *testing.T) {
 			t.Fatalf("%s: %v", body, err)
 		}
 	}
-	// Not CredentialSafe: the same key is not inspected.
+	// Not CredentialBearing: the same key is not inspected.
 	m.Expect(testkit.Exchange{Op: "getMemory", Path: "/v1/agents/a/memories/m", RespBody: `{"memory":{"id":"m","apiKey":"x"}}`})
 	if _, err := c.Memories.Get(context.Background(), "a", "m"); err != nil {
 		t.Fatal(err)

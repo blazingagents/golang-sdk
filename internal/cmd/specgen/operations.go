@@ -16,14 +16,14 @@ import (
 var listStrings = map[string]string{"listTenantChatDeliveries.status": "ChatDeliveryStatus"}
 
 type operation struct {
-	id, method, path string
-	o                schema
-	params           []string
-	query            []string
-	body             string
-	response         string
-	userScoped       bool
-	credentialSafe   bool
+	id, method, path  string
+	o                 schema
+	params            []string
+	query             []string
+	body              string
+	response          string
+	userScoped        bool
+	credentialBearing bool
 }
 
 func (s *spec) operations() ([]*operation, error) {
@@ -62,14 +62,12 @@ func (s *spec) operations() ([]*operation, error) {
 			if op.response, err = s.responseKind(o); err != nil {
 				return nil, fmt.Errorf("%s: %w", id, err)
 			}
-			for _, t := range arr(o["tags"]) {
-				switch t {
-				case "providers", "mcp-connections", "chat-connections":
-					op.credentialSafe = true
-				}
-			}
-			if path == "/v1/merchant-connection" {
-				op.credentialSafe = true
+			switch v, ok := o["x-credential-bearing"]; {
+			case !ok:
+			case v == true:
+				op.credentialBearing = true
+			default:
+				return nil, fmt.Errorf("%s: %s (%s %s) has x-credential-bearing %v; want true or no flag", specPath, id, op.method, path, v)
 			}
 			ops = append(ops, op)
 		}
@@ -376,8 +374,8 @@ func (g *gen) render(ops []*operation) ([]byte, error) {
 		if o.userScoped {
 			w(", UserScoped: true")
 		}
-		if o.credentialSafe {
-			w(", CredentialSafe: true")
+		if o.credentialBearing {
+			w(", CredentialBearing: true")
 		}
 		w("}\n\n")
 		scope := "TenantOnly"
@@ -532,7 +530,7 @@ type Operation struct {
 	Body           BodyKind
 	Response       ResponseKind
 	UserScoped     bool // x-scope "end-user"
-	CredentialSafe bool // tag providers, mcp-connections or chat-connections, or path exactly /v1/merchant-connection
+	CredentialBearing bool // x-credential-bearing: a Secret is never sent redacted, and a credential is never echoed back
 }
 
 // Request is an operation with its raw path parameter values.
