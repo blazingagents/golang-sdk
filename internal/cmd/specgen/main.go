@@ -1,4 +1,5 @@
-// Command specgen generates internal/op/op.go and errorcode.go from the vendored spec.
+// Command specgen generates internal/op/op.go, errorcode.go, enums.go and agenttools.go from
+// the vendored spec.
 //
 //	go run ./internal/cmd/specgen            write the generated files
 //	go run ./internal/cmd/specgen -check     fail when a generated file is stale or the spec breaks a rule
@@ -20,10 +21,11 @@ import (
 )
 
 const (
-	specPath      = "spec/openapi.json"
-	opPath        = "internal/op/op.go"
-	errorCodePath = "errorcode.go"
-	enumsPath     = "enums.go"
+	specPath       = "spec/openapi.json"
+	opPath         = "internal/op/op.go"
+	errorCodePath  = "errorcode.go"
+	enumsPath      = "enums.go"
+	agentToolsPath = "agenttools.go"
 )
 
 var initialisms = map[string]string{"ai": "AI", "api": "API", "id": "ID", "mcp": "MCP", "oauth": "OAuth", "url": "URL",
@@ -160,7 +162,21 @@ func generate() ([]file, error) {
 	if err != nil {
 		return nil, err
 	}
-	return []file{{opPath, src}, {errorCodePath, codes}, {enumsPath, enums}}, nil
+	var ext struct {
+		AgentTools json.RawMessage `json:"x-agent-tools"`
+	}
+	if err := json.Unmarshal(raw, &ext); err != nil {
+		return nil, fmt.Errorf("%s: %w", specPath, err)
+	}
+	catalog, err := parseCatalog(ext.AgentTools)
+	if err != nil {
+		return nil, err
+	}
+	tools, err := g.renderCatalog(catalog, consts)
+	if err != nil {
+		return nil, err
+	}
+	return []file{{opPath, src}, {errorCodePath, codes}, {enumsPath, enums}, {agentToolsPath, tools}}, nil
 }
 
 func (s *spec) resolve(x schema) schema {
