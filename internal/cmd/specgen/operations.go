@@ -152,6 +152,8 @@ type gen struct {
 	enums     map[string]map[string]bool // Go enum type -> values
 	reserved  []string
 	unknownFP []string
+	// errorCodeFP is the sorted, comma-joined API error-code enum.
+	errorCodeFP string
 }
 
 type fieldsEntry struct {

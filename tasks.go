@@ -76,6 +76,7 @@ type TaskRun struct {
 	TurnID            *TurnID       `json:"turnId"`
 	Status            TaskRunStatus `json:"status"`
 	Error             *string       `json:"error"`
+	ErrorCode         *ErrorCode    `json:"errorCode"` // why a blocked or failed run ended, such as ErrorCodeUsageCreditRequired; nil otherwise
 	UserID            string        `json:"userId"`
 	Metadata          Metadata      `json:"metadata"`
 	StartedAt         *time.Time    `json:"startedAt"`

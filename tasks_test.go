@@ -296,7 +296,19 @@ func TestTasksDecoding(t *testing.T) {
 			Call: func(ctx context.Context, c *ba.Client) (any, error) { return c.Tasks.GetRun(ctx, task, run) },
 			Check: func(t *testing.T, got any) {
 				r := got.(*ba.TaskRun)
-				if r.Status != ba.TaskRunStatus("paused") || r.Error == nil || *r.Error != "boom" || r.SessionID != nil || r.TurnID != nil || r.AgentConfig.Tools[1] != ba.AgentTool("teleport") {
+				if r.Status != ba.TaskRunStatus("paused") || r.Error == nil || *r.Error != "boom" || r.ErrorCode != nil || r.SessionID != nil || r.TurnID != nil || r.AgentConfig.Tools[1] != ba.AgentTool("teleport") {
+					t.Fatalf("run %+v", r)
+				}
+			},
+		},
+		{
+			Name: "blocked run with an error code",
+			Exchanges: []testkit.Exchange{{Op: "getTaskRun", Path: path + "/runs/" + string(run),
+				RespBody: `{"id":"` + string(run) + `","status":"blocked","error":"Usage credit required","errorCode":"usage_credit_required","sessionId":null,"turnId":null}`}},
+			Call: func(ctx context.Context, c *ba.Client) (any, error) { return c.Tasks.GetRun(ctx, task, run) },
+			Check: func(t *testing.T, got any) {
+				r := got.(*ba.TaskRun)
+				if r.Status != ba.TaskRunStatusBlocked || r.ErrorCode == nil || *r.ErrorCode != ba.ErrorCodeUsageCreditRequired {
 					t.Fatalf("run %+v", r)
 				}
 			},

@@ -143,7 +143,13 @@ func generate() ([]file, error) {
 	if err != nil {
 		return nil, err
 	}
-	g := &gen{s: s, unions: map[string]*union{}, patterns: map[string]string{}, enums: map[string]map[string]bool{}}
+	var codeValues []string
+	for _, v := range s.errorCodeValues() {
+		codeValues = append(codeValues, v.(string))
+	}
+	sort.Strings(codeValues)
+	g := &gen{s: s, unions: map[string]*union{}, patterns: map[string]string{}, enums: map[string]map[string]bool{},
+		errorCodeFP: strings.Join(codeValues, ",")}
 	for _, o := range ops {
 		if err := g.operation(o); err != nil {
 			return nil, fmt.Errorf("%s: %w", o.id, err)

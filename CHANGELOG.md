@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- `TaskRun.ErrorCode` is the `ErrorCode` a `blocked` or `failed` run ended
+  with, such as `ErrorCodeUsageCreditRequired`, `ErrorCodeQuotaExceeded` or
+  `ErrorCodeProviderRequired`. It is nil for every other run and for a
+  failure without a code; `Error` still carries the message. `Tasks.GetRun`,
+  `Tasks.ListRuns` and `Tasks.AllRuns` return it.
+
 ## 0.2.0 (2026-10-19)
 
 - `AgentTools` and `AgentToolGroups` list the built-in tools an Agent can

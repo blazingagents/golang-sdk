@@ -9,9 +9,7 @@ import (
 
 // errorCodes renders errorcode.go, recording each constant in consts.
 func (s *spec) errorCodes(consts map[string]string) ([]byte, error) {
-	apiErr := obj(s.comps["ApiError"])
-	code := obj(obj(obj(obj(apiErr["properties"])["error"])["properties"])["code"])
-	values := arr(code["enum"])
+	values := s.errorCodeValues()
 	if len(values) == 0 {
 		return nil, errors.New("ApiError.error.code has no enum")
 	}
@@ -29,4 +27,10 @@ func (s *spec) errorCodes(consts map[string]string) ([]byte, error) {
 	}
 	b.WriteString(")\n")
 	return format.Source(b.Bytes())
+}
+
+// errorCodeValues are the values of ApiError.error.code, in spec order.
+func (s *spec) errorCodeValues() []any {
+	apiErr := obj(s.comps["ApiError"])
+	return arr(obj(obj(obj(obj(apiErr["properties"])["error"])["properties"])["code"])["enum"])
 }
