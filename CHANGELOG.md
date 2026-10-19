@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 (2026-10-19)
 
 - `TaskRun.ErrorCode` is the `ErrorCode` a `blocked` or `failed` run ended
   with, such as `ErrorCodeUsageCreditRequired`, `ErrorCodeQuotaExceeded` or
