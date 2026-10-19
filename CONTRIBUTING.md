@@ -5,8 +5,8 @@
 | Command | What it does |
 | --- | --- |
 | `go run ./internal/cmd/gate` | The one test command, locally and in CI. Runs every check below in order and stops at the first failure |
-| `go run ./internal/cmd/specgen` | Regenerates `internal/op/op.go`, `errorcode.go` and `enums.go` |
-| `go run ./internal/cmd/specgen -check` | Fails when a generated file is stale, or the spec has an operation without an `x-scope` of `end-user` or `tenant`, a response `oneOf` outside the union-name table, an ID prefix outside the ID-type table, or a string enum outside the enum-name table |
+| `go run ./internal/cmd/specgen` | Regenerates `internal/op/op.go`, `errorcode.go`, `enums.go` and `agenttools.go` |
+| `go run ./internal/cmd/specgen -check` | Fails when a generated file is stale, or the spec has an operation without an `x-scope` of `end-user` or `tenant`, an `x-credential-bearing` other than `true`, a response `oneOf` outside the union-name table, an ID prefix outside the ID-type table, a string enum outside the enum-name table, or an `x-agent-tools` catalog it cannot map |
 | `go run ./internal/cmd/specgen -drift ../ba-platform/servers/api/openapi.json` | Shows how the platform spec differs from `spec/openapi.json` |
 | `go run ./internal/cmd/specgen -sync ../ba-platform/servers/api/openapi.json` | Copies the platform spec in and regenerates |
 
@@ -22,7 +22,7 @@
 6. **layout.** `go list ./...` is exactly the root package, the three examples, `internal/cmd/gate`, `internal/cmd/specgen`, `internal/op` and `internal/testkit`. `internal/op` holds only `op.go`. The root package imports only the standard library and `internal/op`. No non-test file of the root package has a build constraint or a GOOS or GOARCH file-name suffix, because coverage is measured in one build.
 7. **test files.** Every `_test.go` file is in the module root and declares `package blazingagents_test`. It imports from this module only the root package, `internal/testkit` and `internal/op`. It does not import `unsafe` or use `//go:linkname`.
 8. **hand-typed IDs.** No test contains a literal ID such as `ag_` followed by 16 letters and digits. Fixtures come from `testkit.ID(op.IDPatterns["AgentID"])`, so a wrong prefix in the SDK cannot hide behind the same wrong prefix in a test.
-9. **go test.** `go test -race -count=1` of the root package under an atomic coverage profile. `TestMain` fails when an operation in `op.All` was never served by the mock, or when a string-tagged response union was never round-tripped through `testkit.UnknownRoundTrip`.
+9. **go test.** `go test -race -count=1` of the root package under an atomic coverage profile. `TestMain` fails when an operation in `op.All` was never served by the mock, when a string-tagged response union was never round-tripped through `testkit.UnknownRoundTrip`, or when a response property has no json tag on the model a `testkit.Run` case decoded it into.
 10. **coverage.** At least 99.0% of the root package's statements.
 11. **cross build.** `go build ./...` for windows/amd64, darwin/arm64 and linux/386.
 
@@ -33,8 +33,8 @@ CI runs the gate on Go 1.27, and `go vet ./...` and `go test -race ./...` on Go 
 There is one package at the module root, `blazingagents`, imported as `ba`. The service structs are declared in `client.go`, and each resource file adds the methods of its service: `agents.go`, `sessions.go`, `merchant.go` and so on.
 
 - The core is `client.go`, `options.go`, `transport.go`, `query.go`, `errors.go`, `ids.go`, `nullable.go`, `secret.go`, `date.go`, `page.go`, `union.go`, `unions.go`, `sse.go`, `upload.go`, `download.go`, `messages.go`, `shared.go`, `chat.go`, `generation.go`, `schema.go`, `functions.go` and `runner.go`.
-- `internal/op/op.go`, `errorcode.go` and `enums.go` are generated. Never edit them by hand.
-- `spec/openapi.json` is the vendored platform spec. Each operation's `x-scope` says whether an end user may call it (`end-user`) or it needs Tenant authority (`tenant`), which decides whether a service is on `UserClient`. The server enforces the same field.
+- `internal/op/op.go`, `errorcode.go`, `enums.go` and `agenttools.go` are generated. Never edit them by hand.
+- `spec/openapi.json` is the vendored platform spec. Each operation's `x-scope` says whether an end user may call it (`end-user`) or it needs Tenant authority (`tenant`), which decides whether a service is on `UserClient`. The server enforces the same field. `x-credential-bearing: true` marks an operation whose responses the SDK refuses when they echo a credential.
 - `internal/cmd/specgen` is the generator, `internal/cmd/gate` is the gate, and `internal/testkit` is the test support: the mock server, spec examples and the shared checks.
 - `examples/` holds runnable `main` packages. They use only the public API and the standard library.
 
@@ -44,9 +44,10 @@ Only the generated code, the generator, the gate, the test kit and the examples 
 
 `specgen` reads `spec/openapi.json` and writes:
 
-- `internal/op/op.go`: one `Operation` per spec operation with its method, path, parameters, body and response kind, the scoped request constructors, `op.All`, the request fields `params_test.go` checks, `op.IDPatterns` and the union sites.
+- `internal/op/op.go`: one `Operation` per spec operation with its method, path, parameters, body and response kind, its scope and credential flag, the scoped request constructors, `op.All`, the request fields `params_test.go` checks, `op.IDPatterns` and the union sites.
 - `errorcode.go`: one `ErrorCode` constant per declared error code.
 - `enums.go`: one type per string enum, with constants named `<TypeName><PascalCaseValue>`. Leading words the value repeats from the type name are dropped, so `MCP_CONNECTION_INVALID` of `MCPConnectionErrorCode` is `MCPConnectionErrorCodeInvalid`. The generator fails when two values would name the same constant.
+- `agenttools.go`: `AgentTools` and `AgentToolGroups` from the top-level `x-agent-tools`, in display order. Each tool's first tag is its `Group` and an optional second tag is its `FileAccess`.
 
 To take a new platform spec, run `specgen -sync <path>`, then add a method and tests for each new operation until the gate passes. A new union, ID prefix or enum needs an entry in the generator's naming tables, and `-check` names the missing one.
 
@@ -71,6 +72,7 @@ For each operation, test:
 - every nullable field omitted, `Null` and `Value`;
 - every union: a `testkit.UnknownRoundTrip` test, and a known tag with a missing required key that returns `*DecodeError`;
 - every type that holds a `Secret`: a `testkit.RedactionCase`;
+- every JSON operation: at least one `testkit.Run` case that returns the decoded result, so `TestMain` can check each response property against the model's json tags. A property the model maps by hand needs a `modelAllowlist` entry with its reason;
 - every validation rule, by name.
 
 ## Naming

@@ -7,9 +7,9 @@ README.md is the repository's brief for Tenants: what it is, installation, a qui
 ## Commands
 
 - `go run ./internal/cmd/gate` is the one test command, locally and in CI. It runs gofmt, `go vet`, the pinned staticcheck, `go mod tidy -diff`, `specgen -check`, the layout, test-file and hand-typed-ID checks, `go test -race` under coverage (fails under 99.0% of the root package's statements), and the cross builds. Run it before every push.
-- `go run ./internal/cmd/specgen` regenerates `internal/op/op.go`, `errorcode.go` and `enums.go` from `spec/openapi.json`; each operation's `x-scope` decides whether it is on `UserClient`. Never edit those files by hand. `-drift <path>` shows how an upstream spec differs; `-sync <path>` takes it.
+- `go run ./internal/cmd/specgen` regenerates `internal/op/op.go`, `errorcode.go`, `enums.go` and `agenttools.go` from `spec/openapi.json`; each operation's `x-scope` decides whether it is on `UserClient`, and `x-credential-bearing` whether its responses are checked for an echoed credential. Never edit those files by hand. `-drift <path>` shows how an upstream spec differs; `-sync <path>` takes it.
 - Every `_test.go` file is in the module root and declares `package blazingagents_test`. Tests reach the SDK only through its public API, against `internal/testkit`.
-- `TestMain` fails when an operation in `op.All` was never served by the mock, or when a string-tagged response union was never round-tripped through `testkit.UnknownRoundTrip`. A new operation needs a method and a test; never filter the run to get past it.
+- `TestMain` fails when an operation in `op.All` was never served by the mock, when a string-tagged response union was never round-tripped through `testkit.UnknownRoundTrip`, or when a response property has no json tag on the model a `testkit.Run` case decoded it into (exceptions live in `modelAllowlist` in `internal/testkit/models.go`, each with a reason). A new operation needs a method and a test; never filter the run to get past it.
 - `CONTRIBUTING.md` holds the layout, every gate check, the recipe for adding an operation, and the release process. Never push a `v*` tag without following it: the Go module proxy caches a tagged version permanently.
 - `examples/` holds runnable `main` packages. The gate vets and builds them; they are outside the coverage profile.
 
