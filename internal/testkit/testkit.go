@@ -384,7 +384,8 @@ func RedactionCases() map[string]func(secret string) any {
 }
 
 // Main is the body of TestMain. After a passing, unfiltered run it fails when an operation
-// was never served or a string-tagged union was never round-tripped by UnknownRoundTrip.
+// was never served, a string-tagged union was never round-tripped by UnknownRoundTrip, or a
+// response property has no field on the model a Case decoded it into.
 func Main(m *testing.M) int {
 	code := m.Run()
 	if code != 0 || filtered() {
@@ -402,6 +403,7 @@ func Main(m *testing.M) int {
 		}
 		problems = append(problems, fmt.Sprintf("union %s: no test round-trips an unknown tag through testkit.UnknownRoundTrip", name))
 	}
+	problems = append(problems, modelProblems()...)
 	if len(problems) == 0 {
 		return 0
 	}
