@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	Version               = "0.2.0"
+	Version               = "0.3.0"
 	DefaultBaseURL        = "https://api.blazingagents.com"
 	APIKeyEnv             = "BLAZING_AGENTS_API_KEY"
 	DefaultTimeout        = 60 * time.Second
