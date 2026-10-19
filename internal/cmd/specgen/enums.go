@@ -54,7 +54,8 @@ var tagEnums = map[string]string{"MCPConnectionReconnectResult": "MCPReconnectSt
 // enumNotes are doc comments of single constants.
 var enumNotes = map[string]string{"AgentTool.activate_skill": "valid only in approval overrides"}
 
-// collectEnum records a string enum of two or more values under its Go type.
+// collectEnum records a string enum of two or more values under its Go type. The API
+// error-code enum, as on TaskRun.errorCode, is skipped: errorcode.go types it as ErrorCode.
 func (g *gen) collectEnum(values []any) {
 	var vals []string
 	for _, v := range values {
@@ -67,6 +68,9 @@ func (g *gen) collectEnum(values []any) {
 		return
 	}
 	fp := strings.Join(vals, ",")
+	if fp == g.errorCodeFP {
+		return
+	}
 	name, ok := enumNames[fp]
 	switch {
 	case !ok:
