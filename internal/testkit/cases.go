@@ -44,6 +44,9 @@ func Run(t *testing.T, cases []Case) {
 			case err != nil:
 				t.Fatalf("unexpected error: %v", err)
 			}
+			if len(c.Exchanges) > 0 {
+				recordModel(c.Exchanges[len(c.Exchanges)-1], got)
+			}
 			if c.Example != "" {
 				MatchesExample(t, c.Example, got)
 			}

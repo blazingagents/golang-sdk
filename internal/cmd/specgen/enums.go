@@ -1,0 +1,153 @@
+package main
+
+import (
+	"bytes"
+	"fmt"
+	"go/format"
+	"sort"
+	"strings"
+)
+
+// enumNames names every string enum of two or more values that an operation reaches, keyed
+// by its sorted values. An enum with several fingerprints (a subset in one place) maps every
+// one of them to the same type, whose constants are the union. "" leaves an enum untyped:
+// the SDK fills it itself.
+var enumNames = map[string]string{
+	"MCP_CONNECTION_AUTHENTICATION_FAILED,MCP_CONNECTION_DISCOVERY_FAILED,MCP_CONNECTION_INVALID,MCP_CONNECTION_UNREACHABLE":                                    "MCPConnectionErrorCode",
+	"accepted,committed,delivered,not_placed,uncertain":                                                                                                         "SessionInputState",
+	"accepted,discarded,expired,failed,incomplete,pending,uncertain,unmapped":                                                                                   "MerchantUsageEventStatus",
+	"activate_skill,bash,delete_memory,edit,get_memory,glob,grep,publish_artifacts,read,save_memory,search_memories,update_memory,web_search,write,write_todos": "AgentTool",
+	"bash,delete_memory,edit,get_memory,glob,grep,publish_artifacts,read,save_memory,search_memories,update_memory,web_search,write,write_todos":                "AgentTool",
+	"active,disabled":                                               "AgentStatus",
+	"active,disconnected":                                           "MerchantConnectionStatus",
+	"agent,day,model,session,user":                                  "UsageGroupBy",
+	"ambiguous,confirmed,failed":                                    "ChatDeliveryStatus",
+	"ambiguous,confirmed,failed,pending":                            "ChatDeliveryStatus",
+	"anthropic,custom,google,openai,openrouter,vercel_ai_gateway":   "ProviderType",
+	"approval,idle,running,stopping":                                "SessionActivityState",
+	"approved,denied,pending":                                       "ToolApprovalStatus",
+	"assistant,system,user":                                         "MessageRole",
+	"auto,deny,full,manual":                                         "ApprovalMode",
+	"bearer,none,oauth_authorization_code,oauth_client_credentials": "MCPAuthType",
+	"bind_and_release,discard,investigate,none,retry,wait":          "MerchantUsageEventAction",
+	"biweekly,daily,monthly,weekly":                                 "ResetInterval",
+	"blocked,canceled,failed,queued,running,succeeded":              "TaskRunStatus",
+	"cancelled,error,recovery_exhausted":                            "MerchantWorkflowIssue",
+	"cancelled,failed,succeeded":                                    "MerchantTurnStatus",
+	"card,reply":                                                    "ChatDeliveryKind",
+	"connected,error,needs_auth":                                    "MCPConnectionStatus",
+	"core,plus":                                                     "WorkspaceTier",
+	"dodo,polar":                                                    "MerchantProvider",
+	"fail,pass,unknown":                                             "ChatHealthCheckStatus",
+	"failed,owner_lost,stopped,turn_finished":                       "SessionInputReason",
+	"failed,running,succeeded,waiting":                              "ToolApprovalContinuationState",
+	"live,sandbox":                                                  "MerchantEnvironment",
+	"regenerate-message,submit-message":                             "",
+	"content-filter,error,length,other,stop,tool-calls":             "", // TurnStreamChunk, untyped in v1
+	"slack,telegram":                                                "ChatPlatform",
+	"tar,tar.gz,zip":                                                "ArchiveType",
+}
+
+// tagEnums types the tag of a flat union whose Go struct carries it as a field.
+var tagEnums = map[string]string{"MCPConnectionReconnectResult": "MCPReconnectStatus"}
+
+// enumNotes are doc comments of single constants.
+var enumNotes = map[string]string{"AgentTool.activate_skill": "valid only in approval overrides"}
+
+// collectEnum records a string enum of two or more values under its Go type.
+func (g *gen) collectEnum(values []any) {
+	var vals []string
+	for _, v := range values {
+		if s, ok := v.(string); ok {
+			vals = append(vals, s)
+		}
+	}
+	sort.Strings(vals)
+	if len(vals) < 2 || len(vals) == 2 && vals[0] == "false" && vals[1] == "true" {
+		return
+	}
+	fp := strings.Join(vals, ",")
+	name, ok := enumNames[fp]
+	switch {
+	case !ok:
+		g.unknownFP = append(g.unknownFP, "string enum "+fp+" has no entry in the enum-name table")
+	case name != "":
+		g.addEnum(name, vals)
+	}
+}
+
+func (g *gen) addEnum(name string, vals []string) {
+	if g.enums[name] == nil {
+		g.enums[name] = map[string]bool{}
+	}
+	for _, v := range vals {
+		g.enums[name][v] = true
+	}
+}
+
+// renderEnums renders enums.go, recording each constant in consts.
+func (g *gen) renderEnums(consts map[string]string) ([]byte, error) {
+	for union, name := range tagEnums {
+		g.addEnum(name, sortedKeys(g.unions[union].variants))
+	}
+	var b bytes.Buffer
+	b.WriteString("// Code generated by specgen from spec/openapi.json. DO NOT EDIT.\n\npackage blazingagents\n")
+	for _, name := range sortedKeys(g.enums) {
+		fmt.Fprintf(&b, "\n// %s is a string enum of the API. A value this SDK does not list decodes as itself.\ntype %s string\n\n", name, name)
+		fmt.Fprintf(&b, "// %s values.\nconst (\n", name)
+		for _, v := range sortedKeys(g.enums[name]) {
+			c, err := constName(consts, name, v)
+			if err != nil {
+				return nil, err
+			}
+			if note := enumNotes[name+"."+v]; note != "" {
+				fmt.Fprintf(&b, "\t// %s is %s.\n", c, note)
+			}
+			fmt.Fprintf(&b, "\t%s %s = %q\n", c, name, v)
+		}
+		b.WriteString(")\n")
+	}
+	return format.Source(b.Bytes())
+}
+
+// constName names the constant of value v of enum typ and records it in consts, failing when
+// a value of any enum already took the name.
+func constName(consts map[string]string, typ, v string) (string, error) {
+	c := typ + valueName(typ, v)
+	this := fmt.Sprintf("%s %q", typ, v)
+	if prev, dup := consts[c]; dup {
+		return "", fmt.Errorf("%s and %s both name the constant %s", prev, this, c)
+	}
+	consts[c] = this
+	return c, nil
+}
+
+// valueName is the PascalCase of an enum value of typ: "vercel_ai_gateway" is VercelAIGateway,
+// "tar.gz" TarGz. Leading words the value shares with the leading words of typ are dropped,
+// keeping at least one, so the constant does not stutter: "MCP_CONNECTION_INVALID" of
+// MCPConnectionErrorCode is Invalid.
+func valueName(typ, v string) string {
+	if strings.ToUpper(v) == v {
+		v = strings.ToLower(v)
+	}
+	words := pascalWords(strings.NewReplacer("-", "_", ".", "_", " ", "_").Replace(v))
+	for k := len(words) - 1; k > 0; k-- {
+		p := strings.Join(words[:k], "")
+		if rest, ok := strings.CutPrefix(typ, p); ok && (rest == "" || rest[0] >= 'A' && rest[0] <= 'Z') {
+			return strings.Join(words[k:], "")
+		}
+	}
+	return strings.Join(words, "")
+}
+
+// enumOf is the Go enum type of a schema's string enum, or "".
+func enumOf(sch schema) string {
+	var vals []string
+	for _, v := range arr(sch["enum"]) {
+		if s, ok := v.(string); ok {
+			vals = append(vals, s)
+		}
+	}
+	sort.Strings(vals)
+	return enumNames[strings.Join(vals, ",")]
+}

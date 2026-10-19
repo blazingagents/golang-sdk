@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- `AgentTools` and `AgentToolGroups` list the built-in tools an Agent can
+  enable, with each tool's description, whether it needs a Workspace, its
+  `AgentToolGroupTag` and its `AgentToolFileAccessTag`. They are generated
+  from the API contract, as in the Rust and Python SDKs.
+
 ## 0.1.0 (2026-10-17)
 
 - Initial release.

@@ -63,7 +63,7 @@ func (t *transport) send(ctx context.Context, r op.Request, params any, opts []R
 	if err != nil {
 		return nil, c.connectionError(err) // never a DecodeError
 	}
-	if r.Op.CredentialSafe {
+	if r.Op.CredentialBearing {
 		if err := rejectCredentialEcho(data, c.meta); err != nil {
 			return nil, err
 		}
@@ -472,7 +472,7 @@ func encodeBody(o *op.Operation, params any) (io.Reader, string, []string, error
 		}
 		return nil, "", nil, &ArgumentError{Name: "params", Reason: err.Error(), Err: err}
 	}
-	if o.CredentialSafe && bytes.Contains(data, []byte(`"`+redacted+`"`)) {
+	if o.CredentialBearing && bytes.Contains(data, []byte(`"`+redacted+`"`)) {
 		return nil, "", nil, &ArgumentError{Name: "params", Reason: "a Secret would be sent as " + redacted}
 	}
 	return bytes.NewReader(data), "application/json", secrets, nil
