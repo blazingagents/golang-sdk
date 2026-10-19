@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 (2026-10-19)
 
 - `AgentTools` and `AgentToolGroups` list the built-in tools an Agent can
   enable, with each tool's description, whether it needs a Workspace, its
