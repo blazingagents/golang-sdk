@@ -23,6 +23,7 @@ const (
 	ErrorCodeServiceUnavailable                  ErrorCode = "service_unavailable"
 	ErrorCodeCheckoutEvidenceMismatch            ErrorCode = "checkout_evidence_mismatch"
 	ErrorCodeSubscriptionAlreadyPaid             ErrorCode = "subscription_already_paid"
+	ErrorCodeSubscriptionNotCancelled            ErrorCode = "subscription_not_cancelled"
 	ErrorCodeAgentDisabled                       ErrorCode = "agent_disabled"
 	ErrorCodeAdminAgentManaged                   ErrorCode = "admin_agent_managed"
 	ErrorCodeAgentMCPConnectionNotFound          ErrorCode = "agent_mcp_connection_not_found"
