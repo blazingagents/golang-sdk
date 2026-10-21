@@ -74,6 +74,7 @@ const (
 	ErrorCodeChatWebhookConflict                 ErrorCode = "chat_webhook_conflict"
 	ErrorCodeChatWebhookRegistrationFailed       ErrorCode = "chat_webhook_registration_failed"
 	ErrorCodeMerchantConnectionNotFound          ErrorCode = "merchant_connection_not_found"
+	ErrorCodeMerchantConnectionInUse             ErrorCode = "merchant_connection_in_use"
 	ErrorCodeMerchantCredentialInvalid           ErrorCode = "merchant_credential_invalid"
 	ErrorCodeMerchantProviderUnavailable         ErrorCode = "merchant_provider_unavailable"
 	ErrorCodeMerchantCustomerNotFound            ErrorCode = "merchant_customer_not_found"
