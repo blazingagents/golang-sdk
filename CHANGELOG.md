@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 (2026-10-22)
 
 The API dropped these shapes, so this release removes them without a
 deprecation step. The SDK has no users yet.
