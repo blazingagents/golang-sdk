@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"reflect"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/blazingagents/golang-sdk/internal/op"
@@ -70,7 +69,7 @@ func fields(v reflect.Value) []paramField {
 	return out
 }
 
-// queryValue formats v, or reports false for a nil pointer or slice.
+// queryValue formats v, or reports false for a nil pointer.
 func queryValue(v reflect.Value) (string, bool) {
 	switch v.Kind() {
 	case reflect.Pointer:
@@ -78,15 +77,6 @@ func queryValue(v reflect.Value) (string, bool) {
 			return "", false
 		}
 		return queryValue(v.Elem())
-	case reflect.Slice:
-		if v.IsNil() {
-			return "", false
-		}
-		parts := make([]string, v.Len())
-		for i := range parts {
-			parts[i], _ = queryValue(v.Index(i))
-		}
-		return strings.Join(parts, ","), true
 	}
 	switch v.Type() {
 	case dateType:

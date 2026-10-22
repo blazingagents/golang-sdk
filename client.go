@@ -41,7 +41,6 @@ type Client struct {
 	Tenant              *TenantService
 	SpendingLimits      *SpendingLimitsService
 	ChatConnections     *ChatConnectionsService
-	ChatDeliveries      *ChatDeliveriesService
 	MerchantConnection  *MerchantConnectionService
 	MerchantBindings    *MerchantBindingsService
 	MerchantUsageEvents *MerchantUsageEventsService
@@ -101,7 +100,6 @@ type (
 	TenantService              struct{ s tenantOps }
 	SpendingLimitsService      struct{ s tenantOps }
 	ChatConnectionsService     struct{ s tenantOps }
-	ChatDeliveriesService      struct{ s tenantOps }
 	MerchantConnectionService  struct{ s tenantOps }
 	MerchantBindingsService    struct{ s tenantOps }
 	MerchantUsageEventsService struct{ s tenantOps }
@@ -306,7 +304,6 @@ func newClient(t *transport) *Client {
 		Tenant:              &TenantService{ten},
 		SpendingLimits:      &SpendingLimitsService{ten},
 		ChatConnections:     &ChatConnectionsService{ten},
-		ChatDeliveries:      &ChatDeliveriesService{ten},
 		MerchantConnection:  &MerchantConnectionService{ten},
 		MerchantBindings:    &MerchantBindingsService{ten},
 		MerchantUsageEvents: &MerchantUsageEventsService{ten},

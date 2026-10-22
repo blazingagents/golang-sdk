@@ -3,9 +3,7 @@ package blazingagents_test
 import (
 	"context"
 	"errors"
-	"iter"
 	"net/http"
-	"net/url"
 	"reflect"
 	"strconv"
 	"testing"
@@ -31,20 +29,6 @@ var (
 
 // chatConnectionsTenant is what every request of these tenant-only operations must carry.
 var chatConnectionsTenant = http.Header{"Authorization": {"Bearer " + testkit.APIKey}}
-
-// chatConnectionsTwice ranges seq twice, to show that ranging again starts over.
-func chatConnectionsTwice[T any](seq iter.Seq2[T, error]) ([]T, error) {
-	var out []T
-	for range 2 {
-		for v, err := range seq {
-			if err != nil {
-				return out, err
-			}
-			out = append(out, v)
-		}
-	}
-	return out, nil
-}
 
 func chatConnectionsErr[T any](_ T, err error) error { return err }
 
@@ -254,177 +238,6 @@ func TestChatConnections(t *testing.T) {
 	})
 }
 
-func TestChatDeliveries(t *testing.T) {
-	conn := ba.ChatConnectionID(testkit.ID(op.IDPatterns["ChatConnectionID"]))
-	d1 := ba.ChatDeliveryID(testkit.ID(op.IDPatterns["ChatDeliveryID"]))
-	d2 := ba.ChatDeliveryID(testkit.ID(op.IDPatterns["ChatDeliveryID"]))
-	session := ba.SessionID(testkit.ID(op.IDPatterns["SessionID"]))
-	approval := ba.ApprovalID("apr_1")
-	agent := ba.AgentID(testkit.ID(op.IDPatterns["AgentID"]))
-	path := "/v1/chat-connections/" + string(conn)
-	listExample := testkit.Example("listChatDeliveries", 200)
-	tenantExample := testkit.Example("listTenantChatDeliveries", 200)
-	// A card waiting on an approval, with the nullable fields set and no receipts.
-	card := `{"id":"` + string(d2) + `","kind":"card","status":"ambiguous","attempt":0,"credentialVersion":2,"representation":"fallback",` +
-		`"diagnostic":"timeout","sessionId":"` + string(session) + `","messageId":"m1","approvalId":"` + string(approval) + `","threadId":"slack:C1:1.2",` +
-		`"createdAt":"2026-07-10T10:00:00.000Z","updatedAt":"2026-07-10T10:00:01.000Z"`
-	wantCard := ba.ChatDelivery{ID: d2, Kind: ba.ChatDeliveryKindCard, Status: ba.ChatDeliveryStatusAmbiguous, CredentialVersion: 2, Representation: "fallback",
-		Diagnostic: new("timeout"), SessionID: session, MessageID: new("m1"), ApprovalID: &approval, ThreadID: "slack:C1:1.2",
-		CreatedAt: time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC), UpdatedAt: time.Date(2026, 7, 10, 10, 0, 1, 0, time.UTC)}
-	page := func(item, next string) string { return `{"data":[` + item + `],"nextCursor":` + next + `}` }
-	deliveries := func(q url.Values, body string) testkit.Exchange {
-		return testkit.Exchange{Op: "listChatDeliveries", Path: path + "/deliveries", Header: chatConnectionsTenant, Query: q, RespBody: body}
-	}
-	feed := func(q url.Values, body string) testkit.Exchange {
-		return testkit.Exchange{Op: "listTenantChatDeliveries", Path: "/v1/chat-deliveries", Header: chatConnectionsTenant, Query: q, RespBody: body}
-	}
-	repair := func(params ba.RepairChatDeliveryParams, body string) testkit.Case {
-		return testkit.Case{
-			Name: "repairChatDelivery " + body,
-			Exchanges: []testkit.Exchange{{Op: "repairChatDelivery", Path: path + "/deliveries/" + string(d1) + "/repair", Header: chatConnectionsTenant,
-				Body: body, RespBody: testkit.Example("repairChatDelivery", 200)}},
-			Call: func(ctx context.Context, c *ba.Client) (any, error) {
-				return c.ChatConnections.RepairDelivery(ctx, conn, d1, params)
-			},
-			Example: testkit.Example("repairChatDelivery", 200),
-			Check: func(t *testing.T, got any) {
-				testkit.CoversExample(t, testkit.Example("repairChatDelivery", 200), got)
-				if r := got.(*ba.ChatDeliveryResult); r.Kind != ba.ChatDeliveryKindReply || r.Status != ba.ChatDeliveryStatusConfirmed || r.Attempt != 2 {
-					t.Fatalf("decoded %+v", r)
-				}
-			},
-		}
-	}
-	testkit.Run(t, []testkit.Case{
-		{
-			Name:      "listChatDeliveries",
-			Exchanges: []testkit.Exchange{deliveries(url.Values{"cursor": {"c1"}, "limit": {"10"}}, listExample)},
-			Call: func(ctx context.Context, c *ba.Client) (any, error) {
-				return c.ChatConnections.ListDeliveries(ctx, conn, ba.ListChatDeliveriesParams{Cursor: new("c1"), Limit: new(10)})
-			},
-			Example: listExample,
-			Check: func(t *testing.T, got any) {
-				testkit.CoversExample(t, listExample, got)
-				p := got.(*ba.Page[ba.ChatDelivery])
-				d := p.Data[0]
-				if p.NextCursor != "" || d.Kind != ba.ChatDeliveryKindReply || d.Status != ba.ChatDeliveryStatusConfirmed || d.Attempt != 1 ||
-					d.Diagnostic != nil || d.ApprovalID != nil || *d.MessageID != "412" || string(d.Receipts) != `[{"attempt":1,"messageId":"412"}]` {
-					t.Fatalf("decoded %+v", p)
-				}
-			},
-		},
-		{
-			Name:      "listChatDeliveries nullable fields set, receipts absent, unknown values",
-			Exchanges: []testkit.Exchange{deliveries(nil, page(card+`}`, `"c2"`)), deliveries(nil, page(`{"id":"`+string(d1)+`","kind":"poll","status":"bounced"}`, `null`))},
-			Call: func(ctx context.Context, c *ba.Client) (any, error) {
-				a, err := c.ChatConnections.ListDeliveries(ctx, conn, ba.ListChatDeliveriesParams{})
-				if err != nil {
-					return nil, err
-				}
-				b, err := c.ChatConnections.ListDeliveries(ctx, conn, ba.ListChatDeliveriesParams{})
-				return []*ba.Page[ba.ChatDelivery]{a, b}, err
-			},
-			Check: func(t *testing.T, got any) {
-				p := got.([]*ba.Page[ba.ChatDelivery])
-				if p[0].NextCursor != "c2" || !reflect.DeepEqual(p[0].Data, []ba.ChatDelivery{wantCard}) {
-					t.Fatalf("decoded %+v", p[0])
-				}
-				if d := p[1].Data[0]; d.Kind != "poll" || d.Status != "bounced" {
-					t.Fatalf("decoded %+v", d)
-				}
-			},
-		},
-		{
-			Name: "listChatDeliveries all",
-			Exchanges: []testkit.Exchange{
-				deliveries(url.Values{"limit": {"1"}}, page(card+`}`, `"c2"`)),
-				deliveries(url.Values{"limit": {"1"}, "cursor": {"c2"}}, page(`{"id":"`+string(d1)+`"}`, `null`)),
-				deliveries(url.Values{"limit": {"1"}}, page(card+`}`, `"c2"`)),
-				deliveries(url.Values{"limit": {"1"}, "cursor": {"c2"}}, page(`{"id":"`+string(d1)+`"}`, `null`)),
-			},
-			Call: func(ctx context.Context, c *ba.Client) (any, error) {
-				return chatConnectionsTwice(c.ChatConnections.AllDeliveries(ctx, conn, ba.ListChatDeliveriesParams{Limit: new(1)}))
-			},
-			Check: func(t *testing.T, got any) {
-				var ids []ba.ChatDeliveryID
-				for _, d := range got.([]ba.ChatDelivery) {
-					ids = append(ids, d.ID)
-				}
-				if !reflect.DeepEqual(ids, []ba.ChatDeliveryID{d2, d1, d2, d1}) {
-					t.Fatalf("ids %v", ids)
-				}
-			},
-		},
-		{
-			Name: "listChatDeliveries all from a cursor stops at the error",
-			Exchanges: []testkit.Exchange{
-				deliveries(url.Values{"cursor": {"c0"}}, page(card+`}`, `"c2"`)),
-				{Op: "listChatDeliveries", Path: path + "/deliveries", Query: url.Values{"cursor": {"c2"}}, Status: 400,
-					RespBody: `{"error":{"code":"invalid_cursor","message":"Bad cursor"}}`},
-			},
-			Call: func(ctx context.Context, c *ba.Client) (any, error) {
-				return chatConnectionsTwice(c.ChatConnections.AllDeliveries(ctx, conn, ba.ListChatDeliveriesParams{Cursor: new("c0")}))
-			},
-			Err: "blazingagents: listChatDeliveries: 400 invalid_cursor: Bad cursor",
-		},
-		repair(ba.RepairChatDeliveryParams{}, `{"expectedAttempt":0,"previousSenderStopped":true,"acceptDuplicateRisk":true}`),
-		repair(ba.RepairChatDeliveryParams{ExpectedAttempt: 3}, `{"expectedAttempt":3,"previousSenderStopped":true,"acceptDuplicateRisk":true}`),
-		{
-			Name: "listTenantChatDeliveries",
-			Exchanges: []testkit.Exchange{feed(url.Values{"status": {"failed,ambiguous"}, "since": {"2026-07-10T10:00:00.5Z"}, "cursor": {"c1"}, "limit": {"25"}},
-				tenantExample)},
-			Call: func(ctx context.Context, c *ba.Client) (any, error) {
-				return c.ChatDeliveries.List(ctx, ba.ListTenantChatDeliveriesParams{
-					Status: []ba.ChatDeliveryStatus{ba.ChatDeliveryStatusFailed, ba.ChatDeliveryStatusAmbiguous},
-					Since:  new(time.Date(2026, 7, 10, 11, 0, 0, 5e8, time.FixedZone("CET", 3600))),
-					Cursor: new("c1"), Limit: new(25)})
-			},
-			Example: tenantExample,
-			Check: func(t *testing.T, got any) {
-				testkit.CoversExample(t, tenantExample, got)
-				d := got.(*ba.Page[ba.TenantChatDelivery]).Data[0]
-				if d.Platform != ba.ChatPlatformTelegram || d.Status != ba.ChatDeliveryStatusConfirmed || d.ThreadID != "telegram:5012345678" {
-					t.Fatalf("decoded %+v", d)
-				}
-			},
-		},
-		{
-			Name:      "listTenantChatDeliveries one status",
-			Exchanges: []testkit.Exchange{feed(url.Values{"status": {"failed"}}, page(card+`,"connectionId":"`+string(conn)+`","agentId":"`+string(agent)+`","platform":"slack"}`, `null`))},
-			Call: func(ctx context.Context, c *ba.Client) (any, error) {
-				return c.ChatDeliveries.List(ctx, ba.ListTenantChatDeliveriesParams{Status: []ba.ChatDeliveryStatus{ba.ChatDeliveryStatusFailed}})
-			},
-			Check: func(t *testing.T, got any) {
-				want := ba.TenantChatDelivery{ChatDelivery: wantCard, ConnectionID: conn, AgentID: agent, Platform: ba.ChatPlatformSlack}
-				if p := got.(*ba.Page[ba.TenantChatDelivery]); !reflect.DeepEqual(p.Data, []ba.TenantChatDelivery{want}) {
-					t.Fatalf("decoded %+v", p)
-				}
-			},
-		},
-		{
-			Name: "listTenantChatDeliveries all keeps the filters",
-			Exchanges: []testkit.Exchange{
-				feed(url.Values{"status": {"ambiguous"}}, page(`{"id":"`+string(d1)+`"}`, `"c2"`)),
-				feed(url.Values{"status": {"ambiguous"}, "cursor": {"c2"}}, page(`{"id":"`+string(d2)+`"}`, `null`)),
-				feed(url.Values{"status": {"ambiguous"}}, page(`{"id":"`+string(d1)+`"}`, `"c2"`)),
-				feed(url.Values{"status": {"ambiguous"}, "cursor": {"c2"}}, page(`{"id":"`+string(d2)+`"}`, `null`)),
-			},
-			Call: func(ctx context.Context, c *ba.Client) (any, error) {
-				return chatConnectionsTwice(c.ChatDeliveries.All(ctx, ba.ListTenantChatDeliveriesParams{Status: []ba.ChatDeliveryStatus{ba.ChatDeliveryStatusAmbiguous}}))
-			},
-			Check: func(t *testing.T, got any) {
-				var ids []ba.ChatDeliveryID
-				for _, d := range got.([]ba.TenantChatDelivery) {
-					ids = append(ids, d.ID)
-				}
-				if !reflect.DeepEqual(ids, []ba.ChatDeliveryID{d1, d2, d1, d2}) {
-					t.Fatalf("ids %v", ids)
-				}
-			},
-		},
-	})
-}
-
 // TestChatConnectionsDecodeError checks the type and fields of a malformed known variant's error.
 func TestChatConnectionsDecodeError(t *testing.T) {
 	conn := ba.ChatConnectionID(testkit.ID(op.IDPatterns["ChatConnectionID"]))
@@ -441,7 +254,6 @@ func TestChatConnectionsDecodeError(t *testing.T) {
 // TestChatConnectionsErrors sends one declared error code per operation.
 func TestChatConnectionsErrors(t *testing.T) {
 	conn := ba.ChatConnectionID(testkit.ID(op.IDPatterns["ChatConnectionID"]))
-	delivery := ba.ChatDeliveryID(testkit.ID(op.IDPatterns["ChatDeliveryID"]))
 	agent := ba.AgentID(testkit.ID(op.IDPatterns["AgentID"]))
 	path := "/v1/chat-connections/" + string(conn)
 	for _, tc := range []struct {
@@ -483,19 +295,6 @@ func TestChatConnectionsErrors(t *testing.T) {
 		{testkit.Exchange{Op: "rotateChatCredentials", Path: path + "/credentials", Body: `{"platform":"telegram","botToken":"1:a"}`}, 400, ba.ErrorCodeValidationFailed,
 			func(ctx context.Context, c *ba.Client) error {
 				return chatConnectionsErr(c.ChatConnections.RotateCredentials(ctx, conn, ba.TelegramCredentials{BotToken: ba.NewSecret("1:a")}))
-			}},
-		{testkit.Exchange{Op: "listChatDeliveries", Path: path + "/deliveries", Query: url.Values{"cursor": {"x"}}}, 400, ba.ErrorCodeInvalidCursor,
-			func(ctx context.Context, c *ba.Client) error {
-				return chatConnectionsErr(c.ChatConnections.ListDeliveries(ctx, conn, ba.ListChatDeliveriesParams{Cursor: new("x")}))
-			}},
-		{testkit.Exchange{Op: "repairChatDelivery", Path: path + "/deliveries/" + string(delivery) + "/repair",
-			Body: `{"expectedAttempt":1,"previousSenderStopped":true,"acceptDuplicateRisk":true}`}, 400, ba.ErrorCodeValidationFailed,
-			func(ctx context.Context, c *ba.Client) error {
-				return chatConnectionsErr(c.ChatConnections.RepairDelivery(ctx, conn, delivery, ba.RepairChatDeliveryParams{ExpectedAttempt: 1}))
-			}},
-		{testkit.Exchange{Op: "listTenantChatDeliveries", Path: "/v1/chat-deliveries", Query: url.Values{"status": {"pending"}}}, 400, ba.ErrorCodeValidationFailed,
-			func(ctx context.Context, c *ba.Client) error {
-				return chatConnectionsErr(c.ChatDeliveries.List(ctx, ba.ListTenantChatDeliveriesParams{Status: []ba.ChatDeliveryStatus{ba.ChatDeliveryStatusPending}}))
 			}},
 	} {
 		t.Run(tc.e.Op, func(t *testing.T) {

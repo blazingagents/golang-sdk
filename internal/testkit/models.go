@@ -17,14 +17,17 @@ import (
 // "<Go type>.<property>", and the JSON operations no public type decodes, keyed by
 // operationId, each with the reason the field check skips it.
 var modelAllowlist = map[string]string{
-	"claimChatFunctionCall":   "the Functions runner reads only its claimed flag",
-	"resolveChatFunctionCall": "the Functions runner reads only its accepted flag",
-	"UsageBucket.durationMs":  "UnmarshalJSON converts it into Duration",
-	"UsageTotals.durationMs":  "UnmarshalJSON converts it into Duration",
-	"UserMessage.id":          "UnmarshalJSON checks it and copies it into ID",
-	"UserMessage.metadata":    "UnmarshalJSON copies it into Metadata",
-	"UserMessage.parts":       "UnmarshalJSON checks each part and copies them into Parts",
-	"UserMessage.role":        `always "user": UnmarshalJSON rejects any other role`,
+	"claimChatFunctionCall":         "the Functions runner reads only its claimed flag",
+	"MerchantConnection.status":     `removed: the platform sends a constant "active" until it adopts this release`,
+	"MerchantUsageCounts.uncertain": "removed: the platform sends a constant 0 until it adopts this release",
+	"MerchantUsageCounts.unmapped":  "removed: the platform sends a constant 0 until it adopts this release",
+	"resolveChatFunctionCall":       "the Functions runner reads only its accepted flag",
+	"UsageBucket.durationMs":        "UnmarshalJSON converts it into Duration",
+	"UsageTotals.durationMs":        "UnmarshalJSON converts it into Duration",
+	"UserMessage.id":                "UnmarshalJSON checks it and copies it into ID",
+	"UserMessage.metadata":          "UnmarshalJSON copies it into Metadata",
+	"UserMessage.parts":             "UnmarshalJSON checks each part and copies them into Parts",
+	"UserMessage.role":              `always "user": UnmarshalJSON rejects any other role`,
 }
 
 var models = struct {

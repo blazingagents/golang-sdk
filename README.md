@@ -17,8 +17,8 @@ the standard library and supports Go 1.26 and newer.
 - One method per API operation, checked against the OpenAPI spec in CI.
   Unknown fields and enum values still decode.
 - Agent, Skill, Session, Memory, Prompt, Task, Workspace, Artifact, Provider,
-  MCP connection, Chat connection and delivery, Merchant, Usage, Spending
-  limit and Tenant management.
+  MCP connection, Chat connection, Merchant, Usage, Spending limit and Tenant
+  management.
 - Chat streams of AI SDK UI message stream events, ready to relay to
   `useChat`, with tool approvals and backend functions that run in your
   process.

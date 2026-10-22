@@ -55,26 +55,6 @@ const (
 	ArchiveTypeZip   ArchiveType = "zip"
 )
 
-// ChatDeliveryKind is a string enum of the API. A value this SDK does not list decodes as itself.
-type ChatDeliveryKind string
-
-// ChatDeliveryKind values.
-const (
-	ChatDeliveryKindCard  ChatDeliveryKind = "card"
-	ChatDeliveryKindReply ChatDeliveryKind = "reply"
-)
-
-// ChatDeliveryStatus is a string enum of the API. A value this SDK does not list decodes as itself.
-type ChatDeliveryStatus string
-
-// ChatDeliveryStatus values.
-const (
-	ChatDeliveryStatusAmbiguous ChatDeliveryStatus = "ambiguous"
-	ChatDeliveryStatusConfirmed ChatDeliveryStatus = "confirmed"
-	ChatDeliveryStatusFailed    ChatDeliveryStatus = "failed"
-	ChatDeliveryStatusPending   ChatDeliveryStatus = "pending"
-)
-
 // ChatHealthCheckStatus is a string enum of the API. A value this SDK does not list decodes as itself.
 type ChatHealthCheckStatus string
 
@@ -135,15 +115,6 @@ const (
 	MCPReconnectStatusNeedsAuth MCPReconnectStatus = "needs_auth"
 )
 
-// MerchantConnectionStatus is a string enum of the API. A value this SDK does not list decodes as itself.
-type MerchantConnectionStatus string
-
-// MerchantConnectionStatus values.
-const (
-	MerchantConnectionStatusActive       MerchantConnectionStatus = "active"
-	MerchantConnectionStatusDisconnected MerchantConnectionStatus = "disconnected"
-)
-
 // MerchantEnvironment is a string enum of the API. A value this SDK does not list decodes as itself.
 type MerchantEnvironment string
 
@@ -177,12 +148,11 @@ type MerchantUsageEventAction string
 
 // MerchantUsageEventAction values.
 const (
-	MerchantUsageEventActionBindAndRelease MerchantUsageEventAction = "bind_and_release"
-	MerchantUsageEventActionDiscard        MerchantUsageEventAction = "discard"
-	MerchantUsageEventActionInvestigate    MerchantUsageEventAction = "investigate"
-	MerchantUsageEventActionNone           MerchantUsageEventAction = "none"
-	MerchantUsageEventActionRetry          MerchantUsageEventAction = "retry"
-	MerchantUsageEventActionWait           MerchantUsageEventAction = "wait"
+	MerchantUsageEventActionDiscard     MerchantUsageEventAction = "discard"
+	MerchantUsageEventActionInvestigate MerchantUsageEventAction = "investigate"
+	MerchantUsageEventActionNone        MerchantUsageEventAction = "none"
+	MerchantUsageEventActionRetry       MerchantUsageEventAction = "retry"
+	MerchantUsageEventActionWait        MerchantUsageEventAction = "wait"
 )
 
 // MerchantUsageEventStatus is a string enum of the API. A value this SDK does not list decodes as itself.
@@ -196,8 +166,6 @@ const (
 	MerchantUsageEventStatusFailed     MerchantUsageEventStatus = "failed"
 	MerchantUsageEventStatusIncomplete MerchantUsageEventStatus = "incomplete"
 	MerchantUsageEventStatusPending    MerchantUsageEventStatus = "pending"
-	MerchantUsageEventStatusUncertain  MerchantUsageEventStatus = "uncertain"
-	MerchantUsageEventStatusUnmapped   MerchantUsageEventStatus = "unmapped"
 )
 
 // MerchantWorkflowIssue is a string enum of the API. A value this SDK does not list decodes as itself.

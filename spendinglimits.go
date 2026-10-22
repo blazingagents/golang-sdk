@@ -7,9 +7,9 @@ import (
 	"github.com/blazingagents/golang-sdk/internal/op"
 )
 
-// ModelSpendingLimit is an estimated USD allowance for model tokens, priced from the
-// built-in model price list. It excludes platform compute, storage, workspace and network
-// charges. It resets at midnight UTC every ResetInterval, on the schedule anchored to
+// ModelSpendingLimit is a USD allowance for model tokens, priced from the built-in model price
+// list or the provider's reported cost. It excludes platform compute, storage, workspace and
+// network charges. Each running turn may finish one model request past the limit. It resets at midnight UTC every ResetInterval, on the schedule anchored to
 // ResetStartDate; a future date applies the limit at once until then. It is both the input
 // and the output of the spending-limit operations.
 type ModelSpendingLimit struct {
@@ -26,12 +26,12 @@ type ModelSpendingLimitStatus struct {
 	NextResetAt   *time.Time           `json:"nextResetAt"`
 }
 
-// SpendingLimitPeriod is the current period of a spending limit, in USD.
+// SpendingLimitPeriod is the current period of a spending limit, in USD. AvailableUSD is the
+// limit's amount minus SpentUSD, never below zero.
 type SpendingLimitPeriod struct {
 	StartsAt     time.Time `json:"startsAt"`
 	EndsAt       time.Time `json:"endsAt"`
 	SpentUSD     float64   `json:"spentUsd"`
-	ReservedUSD  float64   `json:"reservedUsd"`
 	AvailableUSD float64   `json:"availableUsd"`
 }
 

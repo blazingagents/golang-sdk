@@ -25,14 +25,24 @@ var (
 	})
 )
 
-// merchantInner is the object under key in the response example of opID.
+// merchantInner is the object under key in the response example of opID, without the
+// constants the platform still sends for SDK 0.41.0 and drops once it adopts this release:
+// the connection's "status" and the summary's "uncertain" and "unmapped" counts.
 func merchantInner(t *testing.T, opID string, status int, key string) string {
 	t.Helper()
-	var env map[string]any
+	var env map[string]map[string]any
 	if err := jsonUnmarshalString(testkit.Example(opID, status), &env); err != nil {
 		t.Fatal(err)
 	}
-	return jsonString(env[key])
+	inner := env[key]
+	if key == "connection" {
+		delete(inner, "status")
+	}
+	if counts, ok := inner["counts"].(map[string]any); ok {
+		delete(counts, "uncertain")
+		delete(counts, "unmapped")
+	}
+	return jsonString(inner)
 }
 
 func merchantMatches(example string) func(*testing.T, any) {
@@ -94,7 +104,7 @@ func TestMerchantConnection(t *testing.T) {
 				merchantMatches(connection)(t, got)
 				c := got.(*ba.MerchantConnection)
 				at := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
-				if c.Provider != ba.MerchantProviderPolar || c.Environment != ba.MerchantEnvironmentSandbox || c.Status != ba.MerchantConnectionStatusActive ||
+				if c.Provider != ba.MerchantProviderPolar || c.Environment != ba.MerchantEnvironmentSandbox ||
 					c.ConfigVersion != 1 || !c.CreatedAt.Equal(at) || !c.UpdatedAt.Equal(at) ||
 					!reflect.DeepEqual(c.Guard, ba.MerchantGuard{ProductIDs: []string{}}) {
 					t.Fatalf("decoded %+v", c)
@@ -103,12 +113,12 @@ func TestMerchantConnection(t *testing.T) {
 		},
 		{
 			Name: "getMerchantConnection unknown values and fields",
-			Exchanges: exchange("getMerchantConnection", 200, "", `{"connection":{"provider":"stripe","environment":"test","status":"paused","futureField":1,`+
+			Exchanges: exchange("getMerchantConnection", 200, "", `{"connection":{"provider":"stripe","environment":"test","futureField":1,`+
 				`"guard":{"enabled":true,"productIds":["p1"],"meterId":"m1"}}}`),
 			Call: get,
 			Check: func(t *testing.T, got any) {
 				c := got.(*ba.MerchantConnection)
-				if c.Provider != "stripe" || c.Environment != "test" || c.Status != "paused" ||
+				if c.Provider != "stripe" || c.Environment != "test" ||
 					!reflect.DeepEqual(c.Guard, ba.MerchantGuard{Enabled: true, ProductIDs: []string{"p1"}, MeterID: new("m1")}) {
 					t.Fatalf("decoded %+v", c)
 				}
@@ -155,11 +165,10 @@ func TestMerchantConnection(t *testing.T) {
 			Err: `blazingagents: createMerchantConnection: decode response: "connection" is null`,
 		},
 		update(ba.UpdateMerchantConnectionParams{Credential: ba.NewSecret("new-key")}, `{"credential":"new-key"}`),
-		update(ba.UpdateMerchantConnectionParams{Status: new(ba.MerchantConnectionStatusDisconnected)}, `{"status":"disconnected"}`),
 		update(ba.UpdateMerchantConnectionParams{Guard: &ba.MerchantGuard{}}, `{"guard":{"enabled":false,"productIds":[],"meterId":null}}`),
-		update(ba.UpdateMerchantConnectionParams{Credential: ba.NewSecret(""), Status: new(ba.MerchantConnectionStatusActive),
+		update(ba.UpdateMerchantConnectionParams{Credential: ba.NewSecret(""),
 			Guard: &ba.MerchantGuard{Enabled: true, MeterID: new("m1")}},
-			`{"credential":"","status":"active","guard":{"enabled":true,"productIds":[],"meterId":"m1"}}`),
+			`{"credential":"","guard":{"enabled":true,"productIds":[],"meterId":"m1"}}`),
 		update(ba.UpdateMerchantConnectionParams{}, `{}`),
 		{
 			Name:      "updateMerchantConnection null",
@@ -305,17 +314,17 @@ func TestMerchantUsageEvents(t *testing.T) {
 	agent := ba.AgentID(testkit.ID(op.IDPatterns["AgentID"]))
 	eventPath := path + "/" + string(e1)
 	eventExample := merchantInner(t, "getMerchantUsageEvent", 200, "event")
-	// An unmapped event, with every nullable field null and values this SDK does not list.
-	unmapped := `{"id":"` + string(e2) + `","turnId":"` + string(turn) + `","connectionId":"` + string(conn) + `","provider":"stripe","userId":"u1",` +
+	// A discarded event, with every nullable field null and values this SDK does not list.
+	discarded := `{"id":"` + string(e2) + `","turnId":"` + string(turn) + `","connectionId":"` + string(conn) + `","provider":"stripe","userId":"u1",` +
 		`"customerId":null,"agentId":"` + string(agent) + `","sessionId":null,"model":"m","modelProvider":"mistral","inputTokens":3000000000,` +
 		`"outputTokens":1,"totalTokens":3000000001,"turnStatus":"timed_out","startedAt":"2026-07-10T10:00:00.000Z","occurredAt":"2026-07-10T10:00:01.000Z",` +
-		`"status":"unmapped","payload":null,"attemptCount":0,"attemptGeneration":2,"lastAttemptAt":null,"lastErrorCode":"customer_missing",` +
-		`"acceptedAt":null,"workflowIssue":"recovery_exhausted","nextAction":"bind_and_release","futureField":true}`
-	wantUnmapped := ba.MerchantUsageEvent{ID: e2, TurnID: turn, ConnectionID: conn, Provider: "stripe", UserID: "u1", AgentID: agent, Model: "m",
+		`"status":"discarded","payload":null,"attemptCount":0,"attemptGeneration":2,"lastAttemptAt":null,"lastErrorCode":"MERCHANT_CUSTOMER_UNMAPPED",` +
+		`"acceptedAt":null,"workflowIssue":"recovery_exhausted","nextAction":"none","futureField":true}`
+	wantDiscarded := ba.MerchantUsageEvent{ID: e2, TurnID: turn, ConnectionID: conn, Provider: "stripe", UserID: "u1", AgentID: agent, Model: "m",
 		ModelProvider: "mistral", InputTokens: 3000000000, OutputTokens: 1, TotalTokens: 3000000001, TurnStatus: "timed_out",
 		StartedAt: time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC), OccurredAt: time.Date(2026, 7, 10, 10, 0, 1, 0, time.UTC),
-		Status: ba.MerchantUsageEventStatusUnmapped, AttemptGeneration: 2, LastErrorCode: new("customer_missing"),
-		WorkflowIssue: new(ba.MerchantWorkflowIssueRecoveryExhausted), NextAction: ba.MerchantUsageEventActionBindAndRelease}
+		Status: ba.MerchantUsageEventStatusDiscarded, AttemptGeneration: 2, LastErrorCode: new("MERCHANT_CUSTOMER_UNMAPPED"),
+		WorkflowIssue: new(ba.MerchantWorkflowIssueRecoveryExhausted), NextAction: ba.MerchantUsageEventActionNone}
 	list := func(q url.Values, body string) testkit.Exchange {
 		return testkit.Exchange{Op: "listMerchantUsageEvents", Path: path, Query: q, Header: merchantTenant, RespBody: body}
 	}
@@ -335,12 +344,12 @@ func TestMerchantUsageEvents(t *testing.T) {
 		},
 		{
 			Name:      "listMerchantUsageEvents nulls and unknown values",
-			Exchanges: []testkit.Exchange{list(nil, `{"events":[`+unmapped+`],"nextCursor":"c2"}`)},
+			Exchanges: []testkit.Exchange{list(nil, `{"events":[`+discarded+`],"nextCursor":"c2"}`)},
 			Call: func(ctx context.Context, c *ba.Client) (any, error) {
 				return c.MerchantUsageEvents.List(ctx, ba.ListMerchantUsageEventsParams{})
 			},
 			Check: func(t *testing.T, got any) {
-				if l := got.(*ba.MerchantUsageEventList); l.NextCursor != "c2" || !reflect.DeepEqual(l.Events, []ba.MerchantUsageEvent{wantUnmapped}) {
+				if l := got.(*ba.MerchantUsageEventList); l.NextCursor != "c2" || !reflect.DeepEqual(l.Events, []ba.MerchantUsageEvent{wantDiscarded}) {
 					t.Fatalf("decoded %+v", l)
 				}
 			},
@@ -348,13 +357,13 @@ func TestMerchantUsageEvents(t *testing.T) {
 		{
 			Name: "listMerchantUsageEvents all",
 			Exchanges: []testkit.Exchange{
-				list(url.Values{"status": {"unmapped"}}, `{"events":[`+unmapped+`],"nextCursor":"c2"}`),
-				list(url.Values{"status": {"unmapped"}, "cursor": {"c2"}}, `{"events":[{"id":"`+string(e1)+`"}],"nextCursor":null}`),
-				list(url.Values{"status": {"unmapped"}}, `{"events":[`+unmapped+`],"nextCursor":"c2"}`),
-				list(url.Values{"status": {"unmapped"}, "cursor": {"c2"}}, `{"events":[{"id":"`+string(e1)+`"}],"nextCursor":null}`),
+				list(url.Values{"status": {"discarded"}}, `{"events":[`+discarded+`],"nextCursor":"c2"}`),
+				list(url.Values{"status": {"discarded"}, "cursor": {"c2"}}, `{"events":[{"id":"`+string(e1)+`"}],"nextCursor":null}`),
+				list(url.Values{"status": {"discarded"}}, `{"events":[`+discarded+`],"nextCursor":"c2"}`),
+				list(url.Values{"status": {"discarded"}, "cursor": {"c2"}}, `{"events":[{"id":"`+string(e1)+`"}],"nextCursor":null}`),
 			},
 			Call: func(ctx context.Context, c *ba.Client) (any, error) {
-				return merchantTwice(c.MerchantUsageEvents.All(ctx, ba.ListMerchantUsageEventsParams{Status: new(ba.MerchantUsageEventStatusUnmapped)}))
+				return merchantTwice(c.MerchantUsageEvents.All(ctx, ba.ListMerchantUsageEventsParams{Status: new(ba.MerchantUsageEventStatusDiscarded)}))
 			},
 			Check: func(t *testing.T, got any) {
 				var ids []ba.MerchantUsageEventID
@@ -369,7 +378,7 @@ func TestMerchantUsageEvents(t *testing.T) {
 		{
 			Name: "listMerchantUsageEvents all stops at the error",
 			Exchanges: []testkit.Exchange{
-				list(nil, `{"events":[`+unmapped+`],"nextCursor":"c2"}`),
+				list(nil, `{"events":[`+discarded+`],"nextCursor":"c2"}`),
 				{Op: "listMerchantUsageEvents", Path: path, Query: url.Values{"cursor": {"c2"}}, Status: 400, RespBody: `{"error":{"code":"invalid_cursor","message":"Bad cursor"}}`},
 			},
 			Call: func(ctx context.Context, c *ba.Client) (any, error) {
@@ -387,7 +396,7 @@ func TestMerchantUsageEvents(t *testing.T) {
 			Check: func(t *testing.T, got any) {
 				merchantMatches(summary)(t, got)
 				s := got.(*ba.MerchantUsageSummary)
-				want := ba.MerchantUsageCounts{Pending: 2, Accepted: 318, Failed: 1, Unmapped: 3, Discarded: 4}
+				want := ba.MerchantUsageCounts{Pending: 2, Accepted: 318, Failed: 1, Discarded: 4}
 				if s.Counts != want || !s.LastAcceptedAt.Equal(time.Date(2026, 7, 10, 10, 12, 10, 0, time.UTC)) ||
 					!reflect.DeepEqual(s.Daily[0], ba.MerchantUsageDay{Day: ba.Date{Year: 2026, Month: time.July, Day: 9}, AcceptedEvents: 41, AcceptedTokens: 98430}) {
 					t.Fatalf("decoded %+v", s)
@@ -422,10 +431,10 @@ func TestMerchantUsageEvents(t *testing.T) {
 			},
 		},
 		{
-			Name: "getMerchantUsageEvent nulls", Exchanges: []testkit.Exchange{{Op: "getMerchantUsageEvent", Path: eventPath, RespBody: `{"event":` + unmapped + `}`}},
+			Name: "getMerchantUsageEvent nulls", Exchanges: []testkit.Exchange{{Op: "getMerchantUsageEvent", Path: eventPath, RespBody: `{"event":` + discarded + `}`}},
 			Call: func(ctx context.Context, c *ba.Client) (any, error) { return c.MerchantUsageEvents.Get(ctx, e1) },
 			Check: func(t *testing.T, got any) {
-				if e := got.(*ba.MerchantUsageEvent); !reflect.DeepEqual(*e, wantUnmapped) {
+				if e := got.(*ba.MerchantUsageEvent); !reflect.DeepEqual(*e, wantDiscarded) {
 					t.Fatalf("decoded %+v", e)
 				}
 			},
@@ -436,7 +445,6 @@ func TestMerchantUsageEvents(t *testing.T) {
 			Err:  `blazingagents: getMerchantUsageEvent: decode response: "event" is null`,
 		},
 		event("retryMerchantUsageEvent", "/retry", func(ctx context.Context, c *ba.Client) (any, error) { return c.MerchantUsageEvents.Retry(ctx, e1) }),
-		event("releaseMerchantUsageEvent", "/release", func(ctx context.Context, c *ba.Client) (any, error) { return c.MerchantUsageEvents.Release(ctx, e1) }),
 		event("discardMerchantUsageEvent", "/discard", func(ctx context.Context, c *ba.Client) (any, error) { return c.MerchantUsageEvents.Discard(ctx, e1) }),
 	})
 }
@@ -489,10 +497,6 @@ func TestMerchantErrors(t *testing.T) {
 		{testkit.Exchange{Op: "retryMerchantUsageEvent", Path: eventPath + "/retry"}, 409, ba.ErrorCodeMerchantEventStateConflict,
 			func(ctx context.Context, c *ba.Client) error {
 				return merchantErr(c.MerchantUsageEvents.Retry(ctx, event))
-			}},
-		{testkit.Exchange{Op: "releaseMerchantUsageEvent", Path: eventPath + "/release"}, 409, ba.ErrorCodeMerchantBindingRequired,
-			func(ctx context.Context, c *ba.Client) error {
-				return merchantErr(c.MerchantUsageEvents.Release(ctx, event))
 			}},
 		{testkit.Exchange{Op: "discardMerchantUsageEvent", Path: eventPath + "/discard"}, 403, ba.ErrorCodeInsufficientScope,
 			func(ctx context.Context, c *ba.Client) error {

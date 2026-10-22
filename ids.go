@@ -6,7 +6,6 @@ type (
 	ApprovalID           string
 	ArtifactID           string
 	ChatConnectionID     string
-	ChatDeliveryID       string
 	FunctionCallID       string
 	MCPConnectionID      string
 	MemoryID             string

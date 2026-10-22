@@ -27,7 +27,6 @@ var idTypes = map[string]string{
 	"ag":     "AgentID",
 	"at":     "ArtifactID",
 	"cc":     "ChatConnectionID",
-	"cd":     "ChatDeliveryID",
 	"fc":     "FunctionCallID",
 	"mch":    "MerchantConnectionID",
 	"mcp":    "MCPConnectionID",

@@ -13,16 +13,15 @@ import (
 // is never returned; KeyFragment holds its last few characters.
 // See https://docs.blazingagents.com/api-reference/rest-api/merchant.
 type MerchantConnection struct {
-	ID                MerchantConnectionID     `json:"id"`
-	Provider          MerchantProvider         `json:"provider"`
-	Environment       MerchantEnvironment      `json:"environment"`
-	Status            MerchantConnectionStatus `json:"status"`
-	MerchantAccountID string                   `json:"merchantAccountId"`
-	KeyFragment       string                   `json:"keyFragment"`
-	Guard             MerchantGuard            `json:"guard"`
-	ConfigVersion     int64                    `json:"configVersion"`
-	CreatedAt         time.Time                `json:"createdAt"`
-	UpdatedAt         time.Time                `json:"updatedAt"`
+	ID                MerchantConnectionID `json:"id"`
+	Provider          MerchantProvider     `json:"provider"`
+	Environment       MerchantEnvironment  `json:"environment"`
+	MerchantAccountID string               `json:"merchantAccountId"`
+	KeyFragment       string               `json:"keyFragment"`
+	Guard             MerchantGuard        `json:"guard"`
+	ConfigVersion     int64                `json:"configVersion"`
+	CreatedAt         time.Time            `json:"createdAt"`
+	UpdatedAt         time.Time            `json:"updatedAt"`
 }
 
 // MerchantGuard checks each end user's plan or balance with the provider before every turn
@@ -66,19 +65,17 @@ func (p CreateMerchantConnectionParams) wire() (any, []string) {
 // UpdateMerchantConnectionParams is the body of updateMerchantConnection. Fields left zero
 // keep their values.
 type UpdateMerchantConnectionParams struct {
-	Credential Secret                    `json:"credential,omitzero"` // same merchant account; the zero Secret leaves it unchanged
-	Status     *MerchantConnectionStatus `json:"status,omitzero"`
-	Guard      *MerchantGuard            `json:"guard,omitzero"` // replaces the whole guard
+	Credential Secret         `json:"credential,omitzero"` // same merchant account; the zero Secret leaves it unchanged
+	Guard      *MerchantGuard `json:"guard,omitzero"`      // replaces the whole guard
 }
 
 type updateMerchantWire struct {
-	Credential *string                   `json:"credential,omitzero"`
-	Status     *MerchantConnectionStatus `json:"status,omitzero"`
-	Guard      *MerchantGuard            `json:"guard,omitzero"`
+	Credential *string        `json:"credential,omitzero"`
+	Guard      *MerchantGuard `json:"guard,omitzero"`
 }
 
 func (p UpdateMerchantConnectionParams) wire() (any, []string) {
-	w := updateMerchantWire{Status: p.Status, Guard: p.Guard}
+	w := updateMerchantWire{Guard: p.Guard}
 	if p.Credential.IsZero() {
 		return w, nil
 	}
@@ -175,9 +172,7 @@ type MerchantUsageSummary struct {
 type MerchantUsageCounts struct {
 	Pending    int64 `json:"pending"`
 	Accepted   int64 `json:"accepted"`
-	Uncertain  int64 `json:"uncertain"`
 	Failed     int64 `json:"failed"`
-	Unmapped   int64 `json:"unmapped"`
 	Incomplete int64 `json:"incomplete"`
 	Expired    int64 `json:"expired"`
 	Discarded  int64 `json:"discarded"`
@@ -204,22 +199,25 @@ func (s *MerchantConnectionService) Get(ctx context.Context, opts ...RequestOpti
 }
 
 // Create connects the tenant's Polar or Dodo account, replacing the current connection
-// (createMerchantConnection). The provider checks the credential first. Monetization stays off
-// until the tenant enables it.
+// (createMerchantConnection). The provider checks the credential first. The replaced
+// connection is retired as Retire does, and Create fails with ErrorCodeMerchantConnectionInUse
+// under the same conditions. Monetization stays off until the tenant enables it.
 // See https://docs.blazingagents.com/api-reference/rest-api/merchant#create-merchant-connection.
 func (s *MerchantConnectionService) Create(ctx context.Context, params CreateMerchantConnectionParams, opts ...RequestOption) (*MerchantConnection, error) {
 	return unwrap[MerchantConnection]("connection")(s.s.send(ctx, op.CreateMerchantConnection(), params, opts))
 }
 
-// Update changes the connection's status or guard, or rotates its credential
+// Update changes the connection's guard, or rotates its credential
 // (updateMerchantConnection).
 // See https://docs.blazingagents.com/api-reference/rest-api/merchant#update-merchant-connection.
 func (s *MerchantConnectionService) Update(ctx context.Context, params UpdateMerchantConnectionParams, opts ...RequestOption) (*MerchantConnection, error) {
 	return unwrap[MerchantConnection]("connection")(s.s.send(ctx, op.UpdateMerchantConnection(), params, opts))
 }
 
-// Retire retires the connection (retireMerchantConnection). Events already recorded keep being
-// delivered with its credential.
+// Retire retires the connection (retireMerchantConnection). It fails with
+// ErrorCodeMerchantConnectionInUse while a request admitted on the connection is still running
+// or one of its usage events is pending. On success the connection's failed events are
+// discarded and its credential is deleted at once, so nothing more is delivered through it.
 // See https://docs.blazingagents.com/api-reference/rest-api/merchant#retire-merchant-connection.
 func (s *MerchantConnectionService) Retire(ctx context.Context, opts ...RequestOption) error {
 	return empty(s.s.send(ctx, op.RetireMerchantConnection(), nil, opts))
@@ -288,18 +286,11 @@ func (s *MerchantUsageEventsService) Get(ctx context.Context, eventID MerchantUs
 	return unwrap[MerchantUsageEvent]("event")(s.s.send(ctx, op.GetMerchantUsageEvent(string(eventID)), nil, opts))
 }
 
-// Retry sends a failed or uncertain event, or a pending one automatic delivery gave up on, to
+// Retry sends a failed event, or a pending one automatic delivery gave up on, to
 // the provider again (retryMerchantUsageEvent). The provider drops duplicates by event ID.
 // See https://docs.blazingagents.com/api-reference/rest-api/merchant#retry-merchant-usage-event.
 func (s *MerchantUsageEventsService) Retry(ctx context.Context, eventID MerchantUsageEventID, opts ...RequestOption) (*MerchantUsageEvent, error) {
 	return unwrap[MerchantUsageEvent]("event")(s.s.send(ctx, op.RetryMerchantUsageEvent(string(eventID)), nil, opts))
-}
-
-// Release sends an unmapped event after its user is bound to a customer
-// (releaseMerchantUsageEvent). Bind the user with MerchantBindings.Set first.
-// See https://docs.blazingagents.com/api-reference/rest-api/merchant#release-merchant-usage-event.
-func (s *MerchantUsageEventsService) Release(ctx context.Context, eventID MerchantUsageEventID, opts ...RequestOption) (*MerchantUsageEvent, error) {
-	return unwrap[MerchantUsageEvent]("event")(s.s.send(ctx, op.ReleaseMerchantUsageEvent(string(eventID)), nil, opts))
 }
 
 // Discard stops delivery of an event and marks it discarded (discardMerchantUsageEvent).
