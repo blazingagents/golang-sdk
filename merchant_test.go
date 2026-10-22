@@ -25,24 +25,14 @@ var (
 	})
 )
 
-// merchantInner is the object under key in the response example of opID, without the
-// constants the platform still sends for SDK 0.41.0 and drops once it adopts this release:
-// the connection's "status" and the summary's "uncertain" and "unmapped" counts.
+// merchantInner is the object under key in the response example of opID.
 func merchantInner(t *testing.T, opID string, status int, key string) string {
 	t.Helper()
-	var env map[string]map[string]any
+	var env map[string]any
 	if err := jsonUnmarshalString(testkit.Example(opID, status), &env); err != nil {
 		t.Fatal(err)
 	}
-	inner := env[key]
-	if key == "connection" {
-		delete(inner, "status")
-	}
-	if counts, ok := inner["counts"].(map[string]any); ok {
-		delete(counts, "uncertain")
-		delete(counts, "unmapped")
-	}
-	return jsonString(inner)
+	return jsonString(env[key])
 }
 
 func merchantMatches(example string) func(*testing.T, any) {
