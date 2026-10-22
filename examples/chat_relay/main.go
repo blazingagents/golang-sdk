@@ -4,14 +4,21 @@
 //
 // The browser needs nothing extra: wire useChat with
 // DefaultChatTransport({ api: "/api/chat", headers: { Authorization: "Bearer <token>" } })
-// and the relay maps its chat id to a session. Tool approval rounds are not handled here; use
-// ChatService.Continue.
+// and the relay maps its chat id to a session. The first response carries the new session's
+// URL in Location, which SetRelayHeaders copies for the browser. Tool approval rounds are not
+// handled here; use ChatService.Continue.
 //
-//	BLAZING_AGENTS_API_KEY=... BLAZING_AGENTS_AGENT_ID=ag_... DEMO_USER_TOKEN=demo-token \
-//	  go run ./examples/chat_relay
+// Every call goes through a client scoped to the signed-in user. A scoped turn needs an Agent
+// and Workspace that user owns, so the relay finds the user's Agent, or creates one with the
+// Provider and model from the environment; the API creates the Agent's Workspace for the same
+// user. Creating an Agent needs a Full API key; a Read-only key cannot create one.
+//
+//	BLAZING_AGENTS_API_KEY=... BLAZING_AGENTS_PROVIDER_ID=prv_... BLAZING_AGENTS_MODEL=... \
+//	  DEMO_USER_TOKEN=demo-token go run ./examples/chat_relay
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log"
@@ -33,11 +40,14 @@ type chatRequest struct {
 type sessionKey struct{ userID, chatID string }
 
 type app struct {
-	client    *ba.Client
-	agentID   ba.AgentID
-	demoToken string
+	client     *ba.Client
+	providerID ba.ProviderID
+	model      string
+	demoToken  string
 
 	mu sync.Mutex
+	// agents maps a user to their Agent. A real app persists this in its database.
+	agents map[string]ba.AgentID
 	// sessions maps useChat's chat id to the session it continues, per user. A real app
 	// persists this in its database.
 	sessions map[sessionKey]ba.SessionID
@@ -47,6 +57,33 @@ func writeError(w http.ResponseWriter, status int, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(map[string]string{"error": message})
+}
+
+// userAgent returns the user's own Agent, creating it on the first call. It holds the lock so
+// two first requests from one user create one Agent.
+func (a *app) userAgent(ctx context.Context, user *ba.UserClient, userID string) (ba.AgentID, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if id, ok := a.agents[userID]; ok {
+		return id, nil
+	}
+	page, err := user.Agents.List(ctx, ba.ListAgentsParams{Limit: new(1)})
+	if err != nil {
+		return "", err
+	}
+	if len(page.Data) == 0 {
+		created, err := user.Agents.Create(ctx, ba.CreateAgentParams{
+			Name:       "Chat assistant",
+			ProviderID: ba.Value(a.providerID),
+			Model:      ba.Value(a.model),
+		})
+		if err != nil {
+			return "", err
+		}
+		page.Data = []ba.Agent{*created}
+	}
+	a.agents[userID] = page.Data[0].ID
+	return page.Data[0].ID, nil
 }
 
 // latestUserMessage is the last user message, which is the one useChat just submitted.
@@ -93,6 +130,12 @@ func (a *app) chat(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid user ID")
 		return
 	}
+	agentID, err := a.userAgent(r.Context(), user, userID)
+	if err != nil {
+		log.Printf("preparing the user's agent failed: %v", err)
+		writeError(w, http.StatusBadGateway, "the agent call failed")
+		return
+	}
 	key := sessionKey{userID, body.ID}
 	a.mu.Lock()
 	sessionID := a.sessions[key]
@@ -101,9 +144,9 @@ func (a *app) chat(w http.ResponseWriter, r *http.Request) {
 	var stream *ba.ChatStream
 	switch {
 	case body.Trigger == "submit-message":
-		stream, err = user.Chat.Send(r.Context(), a.agentID, ba.Messages(message), ba.ChatParams{SessionID: sessionID})
+		stream, err = user.Chat.Send(r.Context(), agentID, ba.Messages(message), ba.ChatParams{SessionID: sessionID})
 	case body.Trigger == "regenerate-message" && sessionID != "":
-		stream, err = user.Chat.Regenerate(r.Context(), a.agentID, sessionID, message, ba.RegenerateParams{MessageID: body.MessageID})
+		stream, err = user.Chat.Regenerate(r.Context(), agentID, sessionID, message, ba.RegenerateParams{MessageID: body.MessageID})
 	case body.Trigger == "regenerate-message":
 		writeError(w, http.StatusBadRequest, "unknown chat id")
 		return
@@ -124,7 +167,6 @@ func (a *app) chat(w http.ResponseWriter, r *http.Request) {
 		a.mu.Unlock()
 	}
 	stream.SetRelayHeaders(w.Header())
-	w.Header().Set("X-Session-Id", string(stream.SessionID()))
 	if _, err := stream.WriteTo(w); err != nil {
 		log.Printf("relay ended: %v", err)
 	}
@@ -136,13 +178,15 @@ func main() {
 		log.Fatal(err)
 	}
 	a := &app{
-		client:    client,
-		agentID:   ba.AgentID(os.Getenv("BLAZING_AGENTS_AGENT_ID")),
-		demoToken: os.Getenv("DEMO_USER_TOKEN"),
-		sessions:  map[sessionKey]ba.SessionID{},
+		client:     client,
+		providerID: ba.ProviderID(os.Getenv("BLAZING_AGENTS_PROVIDER_ID")),
+		model:      os.Getenv("BLAZING_AGENTS_MODEL"),
+		demoToken:  os.Getenv("DEMO_USER_TOKEN"),
+		agents:     map[string]ba.AgentID{},
+		sessions:   map[sessionKey]ba.SessionID{},
 	}
-	if a.agentID == "" || a.demoToken == "" {
-		log.Fatal("set BLAZING_AGENTS_AGENT_ID and DEMO_USER_TOKEN")
+	if a.providerID == "" || a.model == "" || a.demoToken == "" {
+		log.Fatal("set BLAZING_AGENTS_PROVIDER_ID, BLAZING_AGENTS_MODEL and DEMO_USER_TOKEN")
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/chat", a.chat)

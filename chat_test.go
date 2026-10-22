@@ -251,7 +251,9 @@ func TestChatWriteTo(t *testing.T) {
 	ids := newChatIDs()
 	open := func(t *testing.T, sse ...string) *ba.ChatStream {
 		m := testkit.New(t)
-		m.Expect(testkit.Exchange{Op: "createSessionTurn", BodyFunc: func([]byte) error { return nil }, RespHeader: ids.created(), SSE: sse})
+		header := ids.created()
+		header.Set("X-Request-Id", "req_relay")
+		m.Expect(testkit.Exchange{Op: "createSessionTurn", BodyFunc: func([]byte) error { return nil }, RespHeader: header, SSE: sse})
 		stream, err := m.Client().Chat.Send(context.Background(), ids.agent, chatInput(), ba.ChatParams{})
 		if err != nil {
 			t.Fatal(err)
@@ -267,9 +269,23 @@ func TestChatWriteTo(t *testing.T) {
 		if err != nil || n != 18 || rec.Body.String() != "data: a\n\ndata: b\n\n" || !rec.Flushed {
 			t.Fatalf("n %d err %v body %q flushed %v", n, err, rec.Body, rec.Flushed)
 		}
-		want := http.Header{"Content-Type": {"text/event-stream"}, "Cache-Control": {"no-cache"}, "X-Vercel-Ai-Ui-Message-Stream": {"v1"}, "X-Ba-Turn-Id": {ids.turn}}
+		want := http.Header{"Content-Type": {"text/event-stream"}, "Cache-Control": {"no-cache"}, "X-Vercel-Ai-Ui-Message-Stream": {"v1"}, "X-Ba-Turn-Id": {ids.turn}, "Location": {"/v1/agents/" + string(ids.agent) + "/sessions/" + string(ids.session)}, "X-Request-Id": {"req_relay"}}
 		if jsonString(rec.Header()) != jsonString(want) {
 			t.Fatalf("relay headers %v", rec.Header())
+		}
+	})
+	t.Run("a resumed turn relays no Location", func(t *testing.T) {
+		m := testkit.New(t)
+		m.Expect(testkit.Exchange{Op: "resumeSessionTurn", Path: "/v1/agents/" + string(ids.agent) + "/sessions/" + string(ids.session), BodyFunc: func([]byte) error { return nil }, RespHeader: http.Header{"X-Ba-Turn-Id": {ids.turn}}, SSE: []string{"data: a\n\n"}})
+		stream, err := m.Client().Chat.Send(context.Background(), ids.agent, chatInput(), ba.ChatParams{SessionID: ids.session})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { stream.Close() })
+		h := http.Header{}
+		stream.SetRelayHeaders(h)
+		if h.Get("Location") != "" || h.Get("X-Request-Id") != "" || h.Get("X-Ba-Turn-Id") != ids.turn {
+			t.Fatalf("relay headers %v", h)
 		}
 	})
 	t.Run("ResponseWriter without Flush", func(t *testing.T) {

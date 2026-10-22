@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.2 (unreleased)
+
+### Fixed
+
+- `ChatStream.SetRelayHeaders` now also copies the API response's `Location`
+  and `X-Request-Id`. A browser that starts a Session through a relay reads the
+  new Session ID from `Location`, as the TypeScript `useChat` transport does. A
+  resumed turn has no `Location`, so none is set.
+
 ## 0.4.1 (2026-10-22)
 
 ### Removed
