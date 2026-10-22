@@ -11,7 +11,7 @@
 // Every call goes through a client scoped to the signed-in user. A scoped turn needs an Agent
 // and Workspace that user owns, so the relay finds the user's Agent, or creates one with the
 // Provider and model from the environment; the API creates the Agent's Workspace for the same
-// user. Creating an Agent needs a Full API key, not a Read or Scoped one.
+// user. Creating an Agent needs a Full API key; a Read-only key cannot create one.
 //
 //	BLAZING_AGENTS_API_KEY=... BLAZING_AGENTS_PROVIDER_ID=prv_... BLAZING_AGENTS_MODEL=... \
 //	  DEMO_USER_TOKEN=demo-token go run ./examples/chat_relay
