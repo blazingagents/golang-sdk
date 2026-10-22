@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.2 (unreleased)
+## Unreleased
 
 ### Removed
 
