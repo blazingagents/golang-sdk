@@ -97,34 +97,9 @@ func TestWorkspacesRequests(t *testing.T) {
 			},
 		},
 		{
-			Name:      "deleteWorkspace pending",
-			Exchanges: []testkit.Exchange{{Op: "deleteWorkspace", Path: path, NoHeader: tasksNoUser, Status: 202}},
-			Call:      func(ctx context.Context, c *ba.Client) (any, error) { return c.Workspaces.Delete(ctx, ws) },
-			Check: func(t *testing.T, got any) {
-				if _, ok := got.(ba.WorkspaceDeletionPending); !ok {
-					t.Fatalf("got %#v", got)
-				}
-			},
-		},
-		{
-			Name:      "deleteWorkspace completed",
-			Exchanges: []testkit.Exchange{{Op: "deleteWorkspace", Path: path, Status: 204}},
-			Call:      func(ctx context.Context, c *ba.Client) (any, error) { return c.Workspaces.Delete(ctx, ws) },
-			Check: func(t *testing.T, got any) {
-				if _, ok := got.(ba.WorkspaceDeletionCompleted); !ok {
-					t.Fatalf("got %#v", got)
-				}
-			},
-		},
-		{
-			Name:      "deleteWorkspace completed with a body",
-			Exchanges: []testkit.Exchange{{Op: "deleteWorkspace", Path: path, Status: 200, RespBody: `{"deleted":true}`}},
-			Call:      func(ctx context.Context, c *ba.Client) (any, error) { return c.Workspaces.Delete(ctx, ws) },
-			Check: func(t *testing.T, got any) {
-				if _, ok := got.(ba.WorkspaceDeletionCompleted); !ok {
-					t.Fatalf("got %#v", got)
-				}
-			},
+			Name:      "deleteWorkspace",
+			Exchanges: []testkit.Exchange{{Op: "deleteWorkspace", Path: path, NoHeader: tasksNoUser, Status: 204}},
+			Call:      func(ctx context.Context, c *ba.Client) (any, error) { return nil, c.Workspaces.Delete(ctx, ws) },
 		},
 	})
 }
@@ -138,13 +113,13 @@ func TestWorkspacesUserClient(t *testing.T) {
 	}
 	header := http.Header{"X-Ba-User-Id": {"user_42"}}
 	m.Expect(testkit.Exchange{Op: "createWorkspace", Path: "/v1/workspaces", Header: header, Body: `{"tier":"core"}`, Status: 201, RespBody: testkit.Example("createWorkspace", 201)})
-	m.Expect(testkit.Exchange{Op: "deleteWorkspace", Path: "/v1/workspaces/" + string(ws), Header: header, Status: 202})
+	m.Expect(testkit.Exchange{Op: "deleteWorkspace", Path: "/v1/workspaces/" + string(ws), Header: header, Status: 204})
 	ctx := context.Background()
 	if _, err := user.Workspaces.Create(ctx, ba.CreateWorkspaceParams{Tier: new(ba.WorkspaceTierCore)}); err != nil {
 		t.Fatal(err)
 	}
-	if got, err := user.Workspaces.Delete(ctx, ws); err != nil || got != ba.WorkspaceDeletion(ba.WorkspaceDeletionPending{}) {
-		t.Fatalf("%#v %v", got, err)
+	if err := user.Workspaces.Delete(ctx, ws); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -283,7 +258,7 @@ func TestWorkspacesErrors(t *testing.T) {
 		{"updateWorkspace", path, `{"name":null}`, 409, ba.ErrorCodeWorkspaceBusy, "Workspace busy", func(c *ba.Client) (any, error) {
 			return c.Workspaces.Update(ctx, ws, ba.UpdateWorkspaceParams{Name: ba.Null[string]()})
 		}},
-		{"deleteWorkspace", path, "", 409, ba.ErrorCodeWorkspaceInUse, "In use", func(c *ba.Client) (any, error) { return c.Workspaces.Delete(ctx, ws) }},
+		{"deleteWorkspace", path, "", 409, ba.ErrorCodeWorkspaceInUse, "In use", func(c *ba.Client) (any, error) { return nil, c.Workspaces.Delete(ctx, ws) }},
 	} {
 		t.Run(tc.op, func(t *testing.T) {
 			m := testkit.New(t)

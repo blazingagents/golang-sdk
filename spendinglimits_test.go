@@ -14,13 +14,13 @@ func TestSpendingLimits(t *testing.T) {
 	agent := ba.AgentID(testkit.ID(op.IDPatterns["AgentID"]))
 	agentPath := "/v1/agents/" + string(agent) + "/spending-limit"
 	limit := `{"amountUsd":25.5,"resetStartDate":"2026-07-01","resetInterval":"monthly"}`
-	status := `{"spendingLimit":` + limit + `,"period":{"startsAt":"2026-07-01T00:00:00Z","endsAt":"2026-08-01T00:00:00Z","spentUsd":3.25,"reservedUsd":0.5,"availableUsd":21.75},"nextResetAt":"2026-08-01T00:00:00Z"}`
+	status := `{"spendingLimit":` + limit + `,"period":{"startsAt":"2026-07-01T00:00:00Z","endsAt":"2026-08-01T00:00:00Z","spentUsd":3.25,"availableUsd":21.75},"nextResetAt":"2026-08-01T00:00:00Z"}`
 	july := ba.Date{Year: 2026, Month: time.July, Day: 1}
 	august := time.Date(2026, time.August, 1, 0, 0, 0, 0, time.UTC)
 	checkSet := func(t *testing.T, got any) {
 		s := got.(*ba.ModelSpendingLimitStatus)
 		if s.SpendingLimit == nil || *s.SpendingLimit != (ba.ModelSpendingLimit{AmountUSD: 25.5, ResetStartDate: july, ResetInterval: ba.ResetIntervalMonthly}) ||
-			s.Period == nil || *s.Period != (ba.SpendingLimitPeriod{StartsAt: s.Period.StartsAt, EndsAt: s.Period.EndsAt, SpentUSD: 3.25, ReservedUSD: 0.5, AvailableUSD: 21.75}) ||
+			s.Period == nil || *s.Period != (ba.SpendingLimitPeriod{StartsAt: s.Period.StartsAt, EndsAt: s.Period.EndsAt, SpentUSD: 3.25, AvailableUSD: 21.75}) ||
 			!s.Period.StartsAt.Equal(time.Date(2026, time.July, 1, 0, 0, 0, 0, time.UTC)) || !s.Period.EndsAt.Equal(august) ||
 			s.NextResetAt == nil || !s.NextResetAt.Equal(august) {
 			t.Fatalf("decoded %+v", s)

@@ -2,8 +2,6 @@ package blazingagents
 
 import (
 	"context"
-	"encoding/json"
-	"iter"
 	"time"
 
 	"github.com/blazingagents/golang-sdk/internal/op"
@@ -50,46 +48,6 @@ type ChatHealthCheck struct {
 	Code    string                `json:"code"`
 	Status  ChatHealthCheckStatus `json:"status"`
 	Subject *string               `json:"subject,omitzero"`
-}
-
-// ChatDelivery is one reply or approval card a connection tried to post. Only failed and
-// ambiguous deliveries need attention: the platform sends pending ones by itself.
-// See https://docs.blazingagents.com/api-reference/rest-api/chat-connections#delivery-outcomes.
-type ChatDelivery struct {
-	ID                ChatDeliveryID     `json:"id"`
-	Kind              ChatDeliveryKind   `json:"kind"`
-	Status            ChatDeliveryStatus `json:"status"`
-	Attempt           int64              `json:"attempt"`
-	CredentialVersion int64              `json:"credentialVersion"`
-	Representation    string             `json:"representation"`
-	Diagnostic        *string            `json:"diagnostic"`
-	Receipts          json.RawMessage    `json:"receipts,omitzero"` // the platform's receipts, as sent
-	SessionID         SessionID          `json:"sessionId"`
-	MessageID         *string            `json:"messageId"`
-	ApprovalID        *ApprovalID        `json:"approvalId"`
-	ThreadID          string             `json:"threadId"`
-	CreatedAt         time.Time          `json:"createdAt"`
-	UpdatedAt         time.Time          `json:"updatedAt"`
-}
-
-// TenantChatDelivery is a delivery in the tenant-wide attention feed, with its connection.
-type TenantChatDelivery struct {
-	ChatDelivery
-	ConnectionID ChatConnectionID `json:"connectionId"`
-	AgentID      AgentID          `json:"agentId"`
-	Platform     ChatPlatform     `json:"platform"`
-}
-
-// ChatDeliveryResult is a delivery after a repair. Check Status: a successful repair does not
-// by itself mean the message was delivered.
-type ChatDeliveryResult struct {
-	ID           ChatDeliveryID     `json:"id"`
-	SessionID    SessionID          `json:"sessionId"`
-	ThreadID     string             `json:"threadId"`
-	ConnectionID ChatConnectionID   `json:"connectionId"`
-	Kind         ChatDeliveryKind   `json:"kind"`
-	Status       ChatDeliveryStatus `json:"status"`
-	Attempt      int64              `json:"attempt"`
 }
 
 // ChatConnectionSpec is the body of createChatConnection: SlackConnection or TelegramConnection.
@@ -207,34 +165,6 @@ type UpdateChatConnectionParams struct {
 	Configuration *ChatConfigurationUpdate `json:"configuration,omitzero"`
 }
 
-// ListChatDeliveriesParams pages listChatDeliveries.
-type ListChatDeliveriesParams struct {
-	Cursor *string `json:"-" query:"cursor"`
-	Limit  *int    `json:"-" query:"limit"`
-}
-
-// RepairChatDeliveryParams is the body of repairChatDelivery. The SDK always sends
-// previousSenderStopped: true and acceptDuplicateRisk: true: the caller asserts that the
-// previous sender stopped and accepts that the message may be delivered twice.
-type RepairChatDeliveryParams struct {
-	ExpectedAttempt int `json:"expectedAttempt"`
-}
-
-type repairBody struct {
-	ExpectedAttempt       int  `json:"expectedAttempt"`
-	PreviousSenderStopped bool `json:"previousSenderStopped"`
-	AcceptDuplicateRisk   bool `json:"acceptDuplicateRisk"`
-}
-
-// ListTenantChatDeliveriesParams filters listTenantChatDeliveries. Keep the same filters
-// across pages.
-type ListTenantChatDeliveriesParams struct {
-	Status []ChatDeliveryStatus `json:"-" query:"status"` // failed, ambiguous or both (the default); sent comma-joined
-	Since  *time.Time           `json:"-" query:"since"`  // inclusive
-	Cursor *string              `json:"-" query:"cursor"`
-	Limit  *int                 `json:"-" query:"limit"`
-}
-
 var errNilParams = &ArgumentError{Name: "params", Reason: "nil"}
 
 // List returns every chat connection of the tenant (listChatConnections).
@@ -301,54 +231,4 @@ func (s *ChatConnectionsService) RotateCredentials(ctx context.Context, connecti
 		return nil, errNilParams
 	}
 	return decode[ChatConnection](s.s.send(ctx, op.RotateChatCredentials(string(connectionID)), params, opts))
-}
-
-// ListDeliveries returns one page of a connection's deliveries, newest first, in every status
-// (listChatDeliveries).
-// See https://docs.blazingagents.com/api-reference/rest-api/chat-connections#list-chat-deliveries.
-func (s *ChatConnectionsService) ListDeliveries(ctx context.Context, connectionID ChatConnectionID, params ListChatDeliveriesParams, opts ...RequestOption) (*Page[ChatDelivery], error) {
-	return decode[Page[ChatDelivery]](s.s.send(ctx, op.ListChatDeliveries(string(connectionID)), params, opts))
-}
-
-// AllDeliveries iterates over a connection's deliveries from params.Cursor on, fetching pages
-// as needed (listChatDeliveries).
-// See https://docs.blazingagents.com/api-reference/rest-api/chat-connections#list-chat-deliveries.
-func (s *ChatConnectionsService) AllDeliveries(ctx context.Context, connectionID ChatConnectionID, params ListChatDeliveriesParams, opts ...RequestOption) iter.Seq2[ChatDelivery, error] {
-	return all(ctx, func(ctx context.Context, cursor string) (*Page[ChatDelivery], error) {
-		p := params
-		if cursor != "" {
-			p.Cursor = &cursor
-		}
-		return s.ListDeliveries(ctx, connectionID, p, opts...)
-	})
-}
-
-// RepairDelivery sends a stuck reply or approval card again, without running a turn
-// (repairChatDelivery). ExpectedAttempt is the delivery's current Attempt (0 is valid); the
-// repair is refused if it changed. The SDK always sends previousSenderStopped: true and
-// acceptDuplicateRisk: true, so calling it asserts that the previous sender has stopped and
-// accepts that the message may appear twice. Check the result's Status.
-// See https://docs.blazingagents.com/api-reference/rest-api/chat-connections#repair-chat-delivery.
-func (s *ChatConnectionsService) RepairDelivery(ctx context.Context, connectionID ChatConnectionID, deliveryID ChatDeliveryID, params RepairChatDeliveryParams, opts ...RequestOption) (*ChatDeliveryResult, error) {
-	return decode[ChatDeliveryResult](s.s.send(ctx, op.RepairChatDelivery(string(connectionID), string(deliveryID)), repairBody{params.ExpectedAttempt, true, true}, opts))
-}
-
-// List returns one page of the tenant's failed and ambiguous deliveries across every
-// connection, newest first (listTenantChatDeliveries).
-// See https://docs.blazingagents.com/api-reference/rest-api/chat-connections#list-tenant-chat-deliveries.
-func (s *ChatDeliveriesService) List(ctx context.Context, params ListTenantChatDeliveriesParams, opts ...RequestOption) (*Page[TenantChatDelivery], error) {
-	return decode[Page[TenantChatDelivery]](s.s.send(ctx, op.ListTenantChatDeliveries(), params, opts))
-}
-
-// All iterates over the attention feed from params.Cursor on, fetching pages as needed
-// (listTenantChatDeliveries).
-// See https://docs.blazingagents.com/api-reference/rest-api/chat-connections#list-tenant-chat-deliveries.
-func (s *ChatDeliveriesService) All(ctx context.Context, params ListTenantChatDeliveriesParams, opts ...RequestOption) iter.Seq2[TenantChatDelivery, error] {
-	return all(ctx, func(ctx context.Context, cursor string) (*Page[TenantChatDelivery], error) {
-		p := params
-		if cursor != "" {
-			p.Cursor = &cursor
-		}
-		return s.List(ctx, p, opts...)
-	})
 }

@@ -3,7 +3,6 @@ package blazingagents
 import (
 	"context"
 	"iter"
-	"net/http"
 	"time"
 
 	"github.com/blazingagents/golang-sdk/internal/op"
@@ -21,18 +20,6 @@ type Workspace struct {
 	CreatedAt     time.Time     `json:"createdAt"`
 	UpdatedAt     time.Time     `json:"updatedAt"`
 }
-
-// WorkspaceDeletion is how deleteWorkspace ended: WorkspaceDeletionPending or WorkspaceDeletionCompleted.
-type WorkspaceDeletion interface{ isWorkspaceDeletion() }
-
-// WorkspaceDeletionPending is a deletion the server accepted and finishes later (202).
-type WorkspaceDeletionPending struct{}
-
-// WorkspaceDeletionCompleted is a deletion that finished.
-type WorkspaceDeletionCompleted struct{}
-
-func (WorkspaceDeletionPending) isWorkspaceDeletion()   {}
-func (WorkspaceDeletionCompleted) isWorkspaceDeletion() {}
 
 // ListWorkspacesParams filters listWorkspaces.
 type ListWorkspacesParams struct {
@@ -94,16 +81,9 @@ func (s *WorkspacesService) Update(ctx context.Context, workspaceID WorkspaceID,
 	return decode[Workspace](s.s.send(ctx, op.UpdateWorkspace(string(workspaceID)), params, opts))
 }
 
-// Delete deletes a workspace (deleteWorkspace).
-// It returns WorkspaceDeletionPending on 202 and WorkspaceDeletionCompleted on any other 2xx.
+// Delete deletes a workspace and all its files at once (deleteWorkspace). It fails with
+// ErrorCodeWorkspaceInUse while an agent uses the workspace; the error's details list their IDs.
 // See https://docs.blazingagents.com/api-reference/rest-api/workspaces#delete-workspace.
-func (s *WorkspacesService) Delete(ctx context.Context, workspaceID WorkspaceID, opts ...RequestOption) (WorkspaceDeletion, error) {
-	b, err := s.s.send(ctx, op.DeleteWorkspace(string(workspaceID)), nil, opts)
-	switch {
-	case err != nil:
-		return nil, err
-	case b.meta.Status == http.StatusAccepted:
-		return WorkspaceDeletionPending{}, nil
-	}
-	return WorkspaceDeletionCompleted{}, nil
+func (s *WorkspacesService) Delete(ctx context.Context, workspaceID WorkspaceID, opts ...RequestOption) error {
+	return empty(s.s.send(ctx, op.DeleteWorkspace(string(workspaceID)), nil, opts))
 }

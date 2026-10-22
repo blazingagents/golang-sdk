@@ -11,10 +11,6 @@ import (
 	"strings"
 )
 
-// listStrings are string query parameters the SDK sends as a comma-joined list, with the
-// enum type of their items.
-var listStrings = map[string]string{"listTenantChatDeliveries.status": "ChatDeliveryStatus"}
-
 type operation struct {
 	id, method, path  string
 	o                 schema
@@ -176,9 +172,6 @@ func (g *gen) operation(o *operation) error {
 		f.In = in
 		if in == "query" {
 			f.Nullable = false
-			if enum, ok := listStrings[o.id+"."+name]; ok {
-				f.Type, f.Enum = "list-string", enum
-			}
 		}
 		top = append(top, f)
 	}
@@ -556,8 +549,8 @@ type Field struct {
 	In       string // "body", "query" or "header"; "" for a nested property
 	Required bool
 	Nullable bool   // never set on a query field
-	Type     string // "string", "integer", "number", "boolean", "bool-string", "list-string",
-	//                 "date", "date-time", "array", "object", "map", "union", "any"
+	Type     string // "string", "integer", "number", "boolean", "bool-string", "date",
+	//                 "date-time", "array", "object", "map", "union", "any"
 	Props []Field // an object's declared properties, or an array's object items' properties
 	Enum  string  // the generated Go enum type of the value, or of an array's items
 }

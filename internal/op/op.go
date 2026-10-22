@@ -516,13 +516,6 @@ func ListChatConnections() TenantOnly {
 	return TenantOnly{Request{Op: listChatConnections}}
 }
 
-var listChatDeliveries = &Operation{ID: "listChatDeliveries", Method: "GET", Path: "/v1/chat-connections/{id}/deliveries", Params: []string{"id"}, Query: []string{"cursor", "limit"}, Response: JSON, CredentialBearing: true}
-
-// ListChatDeliveries is GET /v1/chat-connections/{id}/deliveries.
-func ListChatDeliveries(id string) TenantOnly {
-	return TenantOnly{Request{Op: listChatDeliveries, Segments: []string{id}}}
-}
-
 var listLatestSessions = &Operation{ID: "listLatestSessions", Method: "GET", Path: "/v1/sessions/latest", Query: []string{"byAgent", "cursor", "limit", "userId"}, Response: JSON, UserScoped: true}
 
 // ListLatestSessions is GET /v1/sessions/latest.
@@ -628,13 +621,6 @@ func ListTasks() UserScoped {
 	return UserScoped{Request{Op: listTasks}}
 }
 
-var listTenantChatDeliveries = &Operation{ID: "listTenantChatDeliveries", Method: "GET", Path: "/v1/chat-deliveries", Query: []string{"status", "since", "cursor", "limit"}, Response: JSON, CredentialBearing: true}
-
-// ListTenantChatDeliveries is GET /v1/chat-deliveries.
-func ListTenantChatDeliveries() TenantOnly {
-	return TenantOnly{Request{Op: listTenantChatDeliveries}}
-}
-
 var listThinkingLevels = &Operation{ID: "listThinkingLevels", Method: "GET", Path: "/v1/providers/{id}/thinking-levels", Params: []string{"id"}, Query: []string{"model"}, Response: JSON, CredentialBearing: true}
 
 // ListThinkingLevels is GET /v1/providers/{id}/thinking-levels.
@@ -670,25 +656,11 @@ func ReconnectMCPConnection(id string) TenantOnly {
 	return TenantOnly{Request{Op: reconnectMcpConnection, Segments: []string{id}}}
 }
 
-var releaseMerchantUsageEvent = &Operation{ID: "releaseMerchantUsageEvent", Method: "POST", Path: "/v1/merchant-usage-events/{eventId}/release", Params: []string{"eventId"}, Response: JSON}
-
-// ReleaseMerchantUsageEvent is POST /v1/merchant-usage-events/{eventId}/release.
-func ReleaseMerchantUsageEvent(eventID string) TenantOnly {
-	return TenantOnly{Request{Op: releaseMerchantUsageEvent, Segments: []string{eventID}}}
-}
-
 var renameChatConnection = &Operation{ID: "renameChatConnection", Method: "PATCH", Path: "/v1/chat-connections/{id}", Params: []string{"id"}, Body: JSONBody, Response: JSON, CredentialBearing: true}
 
 // RenameChatConnection is PATCH /v1/chat-connections/{id}.
 func RenameChatConnection(id string) TenantOnly {
 	return TenantOnly{Request{Op: renameChatConnection, Segments: []string{id}}}
-}
-
-var repairChatDelivery = &Operation{ID: "repairChatDelivery", Method: "POST", Path: "/v1/chat-connections/{id}/deliveries/{deliveryId}/repair", Params: []string{"id", "deliveryId"}, Body: JSONBody, Response: JSON, CredentialBearing: true}
-
-// RepairChatDelivery is POST /v1/chat-connections/{id}/deliveries/{deliveryId}/repair.
-func RepairChatDelivery(id, deliveryID string) TenantOnly {
-	return TenantOnly{Request{Op: repairChatDelivery, Segments: []string{id, deliveryID}}}
 }
 
 var resolveChatFunctionCall = &Operation{ID: "resolveChatFunctionCall", Method: "POST", Path: "/v1/agents/{agentId}/sessions/{sessionId}/function-calls/{functionCallId}/result", Params: []string{"agentId", "sessionId", "functionCallId"}, Body: JSONBody, Response: JSON, UserScoped: true}
@@ -920,7 +892,6 @@ var All = []*Operation{
 	listAgents,
 	listArtifacts,
 	listChatConnections,
-	listChatDeliveries,
 	listLatestSessions,
 	listMcpConnections,
 	listMemories,
@@ -936,15 +907,12 @@ var All = []*Operation{
 	listTaskRunMessages,
 	listTaskRuns,
 	listTasks,
-	listTenantChatDeliveries,
 	listThinkingLevels,
 	listToolApprovals,
 	listWorkspaces,
 	putSkillFile,
 	reconnectMcpConnection,
-	releaseMerchantUsageEvent,
 	renameChatConnection,
-	repairChatDelivery,
 	resolveChatFunctionCall,
 	resumeSessionTurn,
 	retireMerchantConnection,
@@ -982,7 +950,6 @@ var IDPatterns = map[string]string{
 	"AgentID":              `^ag_[0-9A-Za-z]{16}$`,
 	"ArtifactID":           `^at_[0-9A-Za-z]{16}$`,
 	"ChatConnectionID":     `^cc_[0-9A-Za-z]{16}$`,
-	"ChatDeliveryID":       `^cd_[0-9A-Za-z]{16}$`,
 	"FunctionCallID":       `^fc_[0-9A-Za-z]{16}$`,
 	"MCPConnectionID":      `^mcp_[0-9A-Za-z]{16}$`,
 	"MemoryID":             `^mem_[0-9A-Za-z]{16}$`,
@@ -1008,8 +975,8 @@ type Field struct {
 	In       string // "body", "query" or "header"; "" for a nested property
 	Required bool
 	Nullable bool   // never set on a query field
-	Type     string // "string", "integer", "number", "boolean", "bool-string", "list-string",
-	//                 "date", "date-time", "array", "object", "map", "union", "any"
+	Type     string // "string", "integer", "number", "boolean", "bool-string", "date",
+	//                 "date-time", "array", "object", "map", "union", "any"
 	Props []Field // an object's declared properties, or an array's object items' properties
 	Enum  string  // the generated Go enum type of the value, or of an array's items
 }
@@ -1275,10 +1242,6 @@ var Fields = map[string][]Field{
 		{Name: "cursor", In: "query", Type: "string"},
 	},
 	"listChatConnections": nil,
-	"listChatDeliveries": {
-		{Name: "cursor", In: "query", Type: "string"},
-		{Name: "limit", In: "query", Type: "integer"},
-	},
 	"listLatestSessions": {
 		{Name: "byAgent", In: "query", Type: "bool-string"},
 		{Name: "cursor", In: "query", Type: "string"},
@@ -1344,12 +1307,6 @@ var Fields = map[string][]Field{
 		{Name: "cursor", In: "query", Type: "string"},
 		{Name: "limit", In: "query", Type: "integer"},
 	},
-	"listTenantChatDeliveries": {
-		{Name: "status", In: "query", Type: "list-string", Enum: "ChatDeliveryStatus"},
-		{Name: "since", In: "query", Type: "date-time"},
-		{Name: "cursor", In: "query", Type: "string"},
-		{Name: "limit", In: "query", Type: "integer"},
-	},
 	"listThinkingLevels": {
 		{Name: "model", In: "query", Required: true, Type: "string"},
 	},
@@ -1381,7 +1338,6 @@ var Fields = map[string][]Field{
 		{Name: "scope", In: "body", Type: "string"},
 		{Name: "url", In: "body", Required: true, Type: "string"},
 	},
-	"releaseMerchantUsageEvent": nil,
 	"renameChatConnection": {
 		{Name: "configuration", In: "body", Type: "object", Props: []Field{
 			{Name: "businessMode", Type: "boolean"},
@@ -1389,11 +1345,6 @@ var Fields = map[string][]Field{
 			{Name: "chatIds", Type: "array"},
 		}},
 		{Name: "name", In: "body", Type: "string"},
-	},
-	"repairChatDelivery": {
-		{Name: "acceptDuplicateRisk", In: "body", Required: true, Type: "boolean"},
-		{Name: "expectedAttempt", In: "body", Required: true, Type: "integer"},
-		{Name: "previousSenderStopped", In: "body", Required: true, Type: "boolean"},
 	},
 	"resolveChatFunctionCall": {
 		{Name: "claimRequestId", In: "body", Required: true, Type: "string"},
@@ -1481,7 +1432,6 @@ var Fields = map[string][]Field{
 			{Name: "meterId", Required: true, Nullable: true, Type: "string"},
 			{Name: "productIds", Required: true, Type: "array"},
 		}},
-		{Name: "status", In: "body", Type: "string", Enum: "MerchantConnectionStatus"},
 	},
 	"updatePrompt": {
 		{Name: "agentId", In: "body", Nullable: true, Type: "string"},

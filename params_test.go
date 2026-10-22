@@ -35,7 +35,6 @@ var paramsTypes = map[string]reflect.Type{
 	"getUsageOverview":          reflect.TypeFor[ba.UsageOverviewParams](),
 	"listAgents":                reflect.TypeFor[ba.ListAgentsParams](),
 	"listArtifacts":             reflect.TypeFor[ba.ListArtifactsParams](),
-	"listChatDeliveries":        reflect.TypeFor[ba.ListChatDeliveriesParams](),
 	"listLatestSessions":        reflect.TypeFor[ba.ListLatestSessionsParams](),
 	"listMemories":              reflect.TypeFor[ba.ListMemoriesParams](),
 	"listMerchantBindings":      reflect.TypeFor[ba.ListMerchantBindingsParams](),
@@ -48,10 +47,8 @@ var paramsTypes = map[string]reflect.Type{
 	"listTaskRunMessages":       reflect.TypeFor[ba.ListTaskRunMessagesParams](),
 	"listTaskRuns":              reflect.TypeFor[ba.ListTaskRunsParams](),
 	"listTasks":                 reflect.TypeFor[ba.ListTasksParams](),
-	"listTenantChatDeliveries":  reflect.TypeFor[ba.ListTenantChatDeliveriesParams](),
 	"listWorkspaces":            reflect.TypeFor[ba.ListWorkspacesParams](),
 	"renameChatConnection":      reflect.TypeFor[ba.UpdateChatConnectionParams](),
-	"repairChatDelivery":        reflect.TypeFor[ba.RepairChatDeliveryParams](),
 	"setMerchantBinding":        reflect.TypeFor[ba.SetMerchantBindingParams](),
 	"stopSessionTurn":           reflect.TypeFor[ba.StopSessionTurnParams](),
 	"submitSessionInput":        reflect.TypeFor[ba.SubmitSessionInputParams](),
@@ -79,7 +76,7 @@ var paramsBuiltBySDK = []string{
 // paramsExceptions are spec fields that are positional or filled by the SDK.
 var paramsExceptions = map[string]bool{
 	"getSkillFile.path": true, "deleteSkillFile.path": true, "listThinkingLevels.model": true,
-	"createSkill.path": true, "repairChatDelivery.previousSenderStopped": true, "repairChatDelivery.acceptDuplicateRisk": true,
+	"createSkill.path": true,
 }
 
 var (
@@ -228,8 +225,8 @@ func paramsCheckField(t *testing.T, where string, g paramsGoField, s op.Field) {
 			t.Errorf("%s: a required query field is a plain value", where)
 		}
 	case g.in == "query":
-		if !isPtr && !(s.Type == "list-string" && typ.Kind() == reflect.Slice) {
-			t.Errorf("%s: an optional query field is a pointer or a list slice, not %s", where, typ)
+		if !isPtr {
+			t.Errorf("%s: an optional query field is a pointer, not %s", where, typ)
 		}
 	case g.in == "header":
 		if typ.Kind() != reflect.String {
@@ -272,8 +269,6 @@ func paramsCheckKind(t *testing.T, where string, typ reflect.Type, s op.Field) {
 		ok = k == reflect.Float64
 	case "boolean", "bool-string":
 		ok = k == reflect.Bool
-	case "list-string":
-		ok = k == reflect.Slice && elem.Kind() == reflect.String
 	case "date":
 		ok = typ == paramsDate
 	case "date-time":

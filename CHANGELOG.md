@@ -1,5 +1,54 @@
 # Changelog
 
+## Unreleased
+
+The API dropped these shapes, so this release removes them without a
+deprecation step. The SDK has no users yet.
+
+- Removed the chat delivery feed and repair: `ChatConnections.ListDeliveries`,
+  `ChatConnections.AllDeliveries`, `ChatConnections.RepairDelivery`,
+  `Client.ChatDeliveries` (`ChatDeliveriesService`), `ChatDelivery`,
+  `TenantChatDelivery`, `ChatDeliveryResult`, their params types,
+  `ChatDeliveryID`, `ChatDeliveryKind` and `ChatDeliveryStatus`. The Turn
+  that runs a Slack or Telegram conversation now posts its own reply or
+  approval card, with a bounded retry. A reply that still fails stays in the
+  Session transcript, so read it with `Sessions.ListMessages`. Delete code that
+  lists or repairs deliveries.
+- `Workspaces.Delete` returns only an `error`: the API deletes the Workspace
+  at once and answers 204. `WorkspaceDeletion`, `WorkspaceDeletionPending` and
+  `WorkspaceDeletionCompleted` are removed. Migrate with
+  `if err := client.Workspaces.Delete(ctx, id); err != nil { … }`. A
+  Workspace an Agent still uses fails with `ErrorCodeWorkspaceInUse`, as
+  before.
+- Removed `SpendingLimitPeriod.ReservedUSD`. Spending is no longer reserved
+  ahead of a model request: each running Turn may finish one request past the
+  limit, and `AvailableUSD` is the amount minus `SpentUSD`, never below zero.
+- Removed the merchant connection's `disconnected` state:
+  `MerchantConnection.Status`, `UpdateMerchantConnectionParams.Status` and
+  `MerchantConnectionStatus`. To pause billing, turn monetization off with
+  `Tenant.Update` and `MonetizationEnabled: new(false)`.
+- Removed the `uncertain` usage event status (`MerchantUsageEventStatusUncertain`
+  and `MerchantUsageCounts.Uncertain`). An event whose delivery attempts run
+  out ends `failed`, and `MerchantUsageEvents.Retry` sends it again safely.
+- Removed `MerchantUsageEvents.Release`, the `unmapped` status
+  (`MerchantUsageEventStatusUnmapped`, `MerchantUsageCounts.Unmapped`),
+  `MerchantUsageEventActionBindAndRelease` and
+  `ErrorCodeMerchantBindingRequired`. Usage of an End-user with no customer
+  binding is recorded once as `discarded`, with `LastErrorCode`
+  `MERCHANT_CUSTOMER_UNMAPPED`, and is never billed later. Bind End-users with
+  `MerchantBindings.Set` before their first Turn, or enable the guard so an
+  unbound End-user's Turn fails with `ErrorCodeMerchantCustomerUnmapped`.
+- Removed `ErrorCodeCheckoutEvidenceMismatch`: the API never returns it.
+  Delete a comparison or `case` that names it.
+- Added `ErrorCodeAgentBusy`: `Agents.Delete` fails with it while the Agent
+  has a running Turn or a queued or running Task run.
+- `MerchantConnection.Retire`, and `MerchantConnection.Create` when it
+  replaces a connection, fail with `ErrorCodeMerchantConnectionInUse` while a
+  request admitted on the connection is still running or one of its usage
+  events is `pending`. On success the connection's `failed` events are
+  discarded and its credential is deleted at once, so nothing more is
+  delivered through it.
+
 ## 0.3.0 (2026-10-19)
 
 - `TaskRun.ErrorCode` is the `ErrorCode` a `blocked` or `failed` run ended
