@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Removed
+
+- `SessionInputStateDelivered` and `SessionInputStateUncertain`. A steer
+  receipt is now `accepted`, `committed` or `not_placed`. Replace
+  `SessionInputStateDelivered` with `SessionInputStateAccepted`, and
+  `SessionInputStateUncertain` with `SessionInputStateNotPlaced`: send a
+  `not_placed` input again as ordinary chat.
+
+### Changed
+
+- The vendored contract now matches the platform, which no longer sends the
+  merchant connection `status` or the usage summary counts `uncertain` and
+  `unmapped`. The SDK stopped reading them in 0.4.0.
+
 ## 0.4.0 (2026-10-22)
 
 The API dropped these shapes, so this release removes them without a

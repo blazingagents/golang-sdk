@@ -241,9 +241,7 @@ type SessionInputState string
 const (
 	SessionInputStateAccepted  SessionInputState = "accepted"
 	SessionInputStateCommitted SessionInputState = "committed"
-	SessionInputStateDelivered SessionInputState = "delivered"
 	SessionInputStateNotPlaced SessionInputState = "not_placed"
-	SessionInputStateUncertain SessionInputState = "uncertain"
 )
 
 // TaskRunStatus is a string enum of the API. A value this SDK does not list decodes as itself.

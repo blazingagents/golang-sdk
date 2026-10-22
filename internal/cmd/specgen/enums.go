@@ -13,9 +13,9 @@ import (
 // one of them to the same type, whose constants are the union. "" leaves an enum untyped:
 // the SDK fills it itself.
 var enumNames = map[string]string{
-	"MCP_CONNECTION_AUTHENTICATION_FAILED,MCP_CONNECTION_DISCOVERY_FAILED,MCP_CONNECTION_INVALID,MCP_CONNECTION_UNREACHABLE":                                    "MCPConnectionErrorCode",
-	"accepted,committed,delivered,not_placed,uncertain":                                                                                                         "SessionInputState",
-	"accepted,discarded,expired,failed,incomplete,pending":                                                                                                      "MerchantUsageEventStatus",
+	"MCP_CONNECTION_AUTHENTICATION_FAILED,MCP_CONNECTION_DISCOVERY_FAILED,MCP_CONNECTION_INVALID,MCP_CONNECTION_UNREACHABLE": "MCPConnectionErrorCode",
+	"accepted,committed,not_placed":                        "SessionInputState",
+	"accepted,discarded,expired,failed,incomplete,pending": "MerchantUsageEventStatus",
 	"activate_skill,bash,delete_memory,edit,get_memory,glob,grep,publish_artifacts,read,save_memory,search_memories,update_memory,web_search,write,write_todos": "AgentTool",
 	"bash,delete_memory,edit,get_memory,glob,grep,publish_artifacts,read,save_memory,search_memories,update_memory,web_search,write,write_todos":                "AgentTool",
 	"active,disabled":              "AgentStatus",
