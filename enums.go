@@ -168,16 +168,6 @@ const (
 	MerchantUsageEventStatusPending    MerchantUsageEventStatus = "pending"
 )
 
-// MerchantWorkflowIssue is a string enum of the API. A value this SDK does not list decodes as itself.
-type MerchantWorkflowIssue string
-
-// MerchantWorkflowIssue values.
-const (
-	MerchantWorkflowIssueCancelled         MerchantWorkflowIssue = "cancelled"
-	MerchantWorkflowIssueError             MerchantWorkflowIssue = "error"
-	MerchantWorkflowIssueRecoveryExhausted MerchantWorkflowIssue = "recovery_exhausted"
-)
-
 // MessageRole is a string enum of the API. A value this SDK does not list decodes as itself.
 type MessageRole string
 

@@ -29,7 +29,6 @@ var enumNames = map[string]string{
 	"discard,investigate,none,retry,wait":                           "MerchantUsageEventAction",
 	"biweekly,daily,monthly,weekly":                                 "ResetInterval",
 	"blocked,canceled,failed,queued,running,succeeded":              "TaskRunStatus",
-	"cancelled,error,recovery_exhausted":                            "MerchantWorkflowIssue",
 	"cancelled,failed,succeeded":                                    "MerchantTurnStatus",
 	"connected,error,needs_auth":                                    "MCPConnectionStatus",
 	"core,plus":                                                     "WorkspaceTier",
