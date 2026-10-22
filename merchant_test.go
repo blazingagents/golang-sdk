@@ -304,7 +304,7 @@ func TestMerchantUsageEvents(t *testing.T) {
 	agent := ba.AgentID(testkit.ID(op.IDPatterns["AgentID"]))
 	eventPath := path + "/" + string(e1)
 	eventExample := merchantInner(t, "getMerchantUsageEvent", 200, "event")
-	// A discarded event, with every nullable field null and values this SDK does not list.
+	// A discarded event, with every nullable field null, values this SDK does not list, and the removed workflowIssue.
 	discarded := `{"id":"` + string(e2) + `","turnId":"` + string(turn) + `","connectionId":"` + string(conn) + `","provider":"stripe","userId":"u1",` +
 		`"customerId":null,"agentId":"` + string(agent) + `","sessionId":null,"model":"m","modelProvider":"mistral","inputTokens":3000000000,` +
 		`"outputTokens":1,"totalTokens":3000000001,"turnStatus":"timed_out","startedAt":"2026-07-10T10:00:00.000Z","occurredAt":"2026-07-10T10:00:01.000Z",` +
@@ -314,7 +314,7 @@ func TestMerchantUsageEvents(t *testing.T) {
 		ModelProvider: "mistral", InputTokens: 3000000000, OutputTokens: 1, TotalTokens: 3000000001, TurnStatus: "timed_out",
 		StartedAt: time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC), OccurredAt: time.Date(2026, 7, 10, 10, 0, 1, 0, time.UTC),
 		Status: ba.MerchantUsageEventStatusDiscarded, AttemptGeneration: 2, LastErrorCode: new("MERCHANT_CUSTOMER_UNMAPPED"),
-		WorkflowIssue: new(ba.MerchantWorkflowIssueRecoveryExhausted), NextAction: ba.MerchantUsageEventActionNone}
+		NextAction: ba.MerchantUsageEventActionNone}
 	list := func(q url.Values, body string) testkit.Exchange {
 		return testkit.Exchange{Op: "listMerchantUsageEvents", Path: path, Query: q, Header: merchantTenant, RespBody: body}
 	}
@@ -414,7 +414,7 @@ func TestMerchantUsageEvents(t *testing.T) {
 				e := got.(*ba.MerchantUsageEvent)
 				if e.Provider != ba.MerchantProviderPolar || e.ModelProvider != ba.ProviderTypeOpenRouter || e.TurnStatus != ba.MerchantTurnStatusSucceeded ||
 					e.Status != ba.MerchantUsageEventStatusAccepted || e.NextAction != ba.MerchantUsageEventActionNone || e.TotalTokens != 2452 ||
-					e.WorkflowIssue != nil || e.LastErrorCode != nil || *e.CustomerID == "" || e.SessionID == nil || e.Payload["events"] == nil ||
+					e.LastErrorCode != nil || *e.CustomerID == "" || e.SessionID == nil || e.Payload["events"] == nil ||
 					!e.AcceptedAt.Equal(time.Date(2026, 7, 10, 10, 12, 10, 0, time.UTC)) {
 					t.Fatalf("decoded %+v", e)
 				}

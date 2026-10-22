@@ -2,6 +2,25 @@
 
 ## 0.4.2 (unreleased)
 
+### Removed
+
+- `MerchantUsageEvent.WorkflowIssue` and the `MerchantWorkflowIssue` type and
+  constants. The API no longer sends `workflowIssue`, and the SDK ignores it
+  if it appears. Read `NextAction` instead. It is
+  `MerchantUsageEventActionRetry` for a `pending` event whose automatic
+  delivery has stopped, which is when `WorkflowIssue` was set:
+
+  ```go
+  // Before
+  if event.WorkflowIssue != nil {
+  	_, err = client.MerchantUsageEvents.Retry(ctx, event.ID)
+  }
+  // After
+  if event.NextAction == ba.MerchantUsageEventActionRetry {
+  	_, err = client.MerchantUsageEvents.Retry(ctx, event.ID)
+  }
+  ```
+
 ### Fixed
 
 - `ChatStream.SetRelayHeaders` now also copies the API response's `Location`

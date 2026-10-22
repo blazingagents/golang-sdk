@@ -140,7 +140,6 @@ type MerchantUsageEvent struct {
 	LastAttemptAt     *time.Time               `json:"lastAttemptAt"`
 	LastErrorCode     *string                  `json:"lastErrorCode"`
 	AcceptedAt        *time.Time               `json:"acceptedAt"`
-	WorkflowIssue     *MerchantWorkflowIssue   `json:"workflowIssue"`
 	NextAction        MerchantUsageEventAction `json:"nextAction"`
 }
 
