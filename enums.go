@@ -29,6 +29,7 @@ const (
 	AgentToolSaveMemory       AgentTool = "save_memory"
 	AgentToolSearchMemories   AgentTool = "search_memories"
 	AgentToolUpdateMemory     AgentTool = "update_memory"
+	AgentToolWebFetch         AgentTool = "web_fetch"
 	AgentToolWebSearch        AgentTool = "web_search"
 	AgentToolWrite            AgentTool = "write"
 	AgentToolWriteTodos       AgentTool = "write_todos"

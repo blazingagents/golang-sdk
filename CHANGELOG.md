@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `AgentToolWebFetch` (`web_fetch`) joins the Agent tool catalog (`AgentTools`). It reads a public web page or text document by URL and returns markdown, and needs no Workspace. Like every tool it is off until you list it in `Tools`, and an approval policy can name it. `web_fetch` is now a reserved function name. The `web` group description now reads "Search the public web and read pages by URL."
+
 ## 0.5.0 (2026-10-22)
 
 ### Removed

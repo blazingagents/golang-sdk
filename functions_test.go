@@ -30,6 +30,7 @@ func TestNewFunctionsValidation(t *testing.T) {
 		{"too many", many, "blazingagents: invalid argument functions: 33 functions; at most 32"},
 		{"bad name", []ba.FunctionDef{functionsDef("1abc")}, "blazingagents: invalid argument function 1abc: name must match ^[A-Za-z][A-Za-z0-9_-]{0,63}$"},
 		{"reserved", []ba.FunctionDef{functionsDef("bash")}, "blazingagents: invalid argument function bash: name is reserved for a builtin or MCP tool"},
+		{"reserved web_fetch", []ba.FunctionDef{functionsDef("web_fetch")}, "blazingagents: invalid argument function web_fetch: name is reserved for a builtin or MCP tool"},
 		{"mcp prefix", []ba.FunctionDef{functionsDef("mcp__x")}, "blazingagents: invalid argument function mcp__x: name is reserved for a builtin or MCP tool"},
 		{"duplicate", []ba.FunctionDef{functionsDef("a"), functionsDef("a")}, "blazingagents: invalid argument function a: duplicate name"},
 		{"blank description", []ba.FunctionDef{ba.FunctionJSON("a", " \n", json.RawMessage(`{"type":"object"}`), functionsNoop)}, "blazingagents: invalid argument function a: blank description"},

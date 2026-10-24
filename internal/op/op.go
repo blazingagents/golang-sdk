@@ -967,7 +967,7 @@ var IDPatterns = map[string]string{
 }
 
 // ReservedToolNames is the enum of the builtin ToolReference variant.
-var ReservedToolNames = []string{"read", "write", "edit", "grep", "glob", "bash", "publish_artifacts", "write_todos", "save_memory", "get_memory", "search_memories", "update_memory", "delete_memory", "web_search", "activate_skill"}
+var ReservedToolNames = []string{"read", "write", "edit", "grep", "glob", "bash", "publish_artifacts", "write_todos", "save_memory", "get_memory", "search_memories", "update_memory", "delete_memory", "web_search", "web_fetch", "activate_skill"}
 
 // Field is one input of an operation, for the params shape test.
 type Field struct {

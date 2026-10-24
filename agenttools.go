@@ -47,7 +47,7 @@ var AgentToolGroups = []AgentToolGroup{
 	{Tag: AgentToolGroupTagFiles, Name: "File operations", Description: "Read, write, edit, search, and run shell commands in the attached Workspace."},
 	{Tag: AgentToolGroupTagPlanning, Name: "Task planning", Description: "Create and manage a structured todo list to plan and track multi-step work."},
 	{Tag: AgentToolGroupTagMemory, Name: "Memory", Description: "Save, recall, search, update, and delete durable notes owned by this Agent."},
-	{Tag: AgentToolGroupTagWeb, Name: "Web", Description: "Search the public web for current information."},
+	{Tag: AgentToolGroupTagWeb, Name: "Web", Description: "Search the public web and read pages by URL."},
 }
 
 // AgentTools is every built-in tool an Agent can enable through Tools, in display order.
@@ -66,4 +66,5 @@ var AgentTools = []AgentToolDefinition{
 	{Name: AgentToolUpdateMemory, Description: "Update a saved note.", RequiresWorkspace: false, Group: AgentToolGroupTagMemory},
 	{Name: AgentToolDeleteMemory, Description: "Delete a saved note.", RequiresWorkspace: false, Group: AgentToolGroupTagMemory},
 	{Name: AgentToolWebSearch, Description: "Search the public web for current results. Each search consumes Usage credit.", RequiresWorkspace: false, Group: AgentToolGroupTagWeb},
+	{Name: AgentToolWebFetch, Description: "Read a public web page or text document by URL, returned as markdown.", RequiresWorkspace: false, Group: AgentToolGroupTagWeb},
 }

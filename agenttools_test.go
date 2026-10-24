@@ -48,3 +48,18 @@ func TestAgentToolsMatchTheContract(t *testing.T) {
 		t.Errorf("AgentTools = %+v, want %+v", ba.AgentTools, tools)
 	}
 }
+
+func TestWebToolsNeedNoWorkspace(t *testing.T) {
+	var names []ba.AgentTool
+	for _, d := range ba.AgentTools {
+		if d.Group == ba.AgentToolGroupTagWeb {
+			names = append(names, d.Name)
+			if d.RequiresWorkspace {
+				t.Errorf("%s requires a Workspace", d.Name)
+			}
+		}
+	}
+	if want := []ba.AgentTool{ba.AgentToolWebSearch, ba.AgentToolWebFetch}; !reflect.DeepEqual(names, want) {
+		t.Errorf("web tools = %v, want %v", names, want)
+	}
+}
