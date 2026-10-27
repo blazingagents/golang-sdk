@@ -1071,13 +1071,6 @@ var Fields = map[string][]Field{
 		{Name: "scope", In: "body", Type: "string"},
 		{Name: "url", In: "body", Required: true, Type: "string"},
 	},
-	"createMcpConnection#authType=oauth_client_credentials": {
-		{Name: "clientId", In: "body", Required: true, Type: "string"},
-		{Name: "clientSecret", In: "body", Required: true, Type: "string"},
-		{Name: "name", In: "body", Required: true, Type: "string"},
-		{Name: "scope", In: "body", Type: "string"},
-		{Name: "url", In: "body", Required: true, Type: "string"},
-	},
 	"createMemory": {
 		{Name: "text", In: "body", Required: true, Type: "string"},
 		{Name: "userId", In: "body", Type: "string"},
@@ -1332,12 +1325,6 @@ var Fields = map[string][]Field{
 		{Name: "scope", In: "body", Type: "string"},
 		{Name: "url", In: "body", Required: true, Type: "string"},
 	},
-	"reconnectMcpConnection#authType=oauth_client_credentials": {
-		{Name: "clientId", In: "body", Required: true, Type: "string"},
-		{Name: "clientSecret", In: "body", Required: true, Type: "string"},
-		{Name: "scope", In: "body", Type: "string"},
-		{Name: "url", In: "body", Required: true, Type: "string"},
-	},
 	"renameChatConnection": {
 		{Name: "configuration", In: "body", Type: "object", Props: []Field{
 			{Name: "businessMode", Type: "boolean"},
@@ -1452,11 +1439,6 @@ var Fields = map[string][]Field{
 	"updateTenantSettings": {
 		{Name: "monetizationEnabled", In: "body", Type: "boolean"},
 		{Name: "name", In: "body", Type: "string"},
-		{Name: "quota", In: "body", Nullable: true, Type: "object", Props: []Field{
-			{Name: "monthlyRequestLimit", Required: true, Nullable: true, Type: "integer"},
-			{Name: "monthlyTokenLimit", Required: true, Nullable: true, Type: "integer"},
-			{Name: "resetDay", Required: true, Type: "integer"},
-		}},
 	},
 	"updateTenantSpendingLimit": {
 		{Name: "spendingLimit", In: "body", Required: true, Nullable: true, Type: "object", Props: []Field{

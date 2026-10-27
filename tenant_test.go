@@ -20,8 +20,8 @@ func TestTenant(t *testing.T) {
 			Example: testkit.Example("updateTenantSettings", 200),
 			Check: func(t *testing.T, got any) {
 				s := got.(*ba.TenantSettings)
-				if s.Quota == nil || s.Quota.MonthlyTokenLimit == nil || *s.Quota.MonthlyTokenLimit != 5000000 || s.Quota.MonthlyRequestLimit != nil || s.Quota.ResetDay != 1 {
-					t.Fatalf("decoded %+v", s.Quota)
+				if s.Name != "Acme" || s.MonetizationEnabled || s.Deletion != nil {
+					t.Fatalf("decoded %+v", s)
 				}
 			},
 		}
@@ -34,33 +34,26 @@ func TestTenant(t *testing.T) {
 			Example:   testkit.Example("getTenantSettings", 200),
 			Check: func(t *testing.T, got any) {
 				s := got.(*ba.TenantSettings)
-				if s.Name != "Acme" || s.MonetizationEnabled || s.Deletion != nil || s.Quota == nil ||
-					*s.Quota != (ba.TenantQuota{MonthlyTokenLimit: s.Quota.MonthlyTokenLimit, MonthlyRequestLimit: s.Quota.MonthlyRequestLimit, ResetDay: 1}) ||
-					*s.Quota.MonthlyTokenLimit != 5000000 || *s.Quota.MonthlyRequestLimit != 10000 {
+				if s.Name != "Acme" || s.MonetizationEnabled || s.Deletion != nil {
 					t.Fatalf("decoded %+v", s)
 				}
 			},
 		},
 		{
-			Name: "getTenantSettings deletion scheduled and no quota",
+			Name: "getTenantSettings deletion scheduled",
 			Exchanges: []testkit.Exchange{{Op: "getTenantSettings", Path: "/v1/tenant",
-				RespBody: `{"name":"Acme","quota":null,"monetizationEnabled":true,"deletion":{"deletesAt":"2026-08-01T00:00:00Z","requestedAt":"2026-07-02T09:30:00Z"},"plan":"pro"}`}},
+				RespBody: `{"name":"Acme","monetizationEnabled":true,"deletion":{"deletesAt":"2026-08-01T00:00:00Z","requestedAt":"2026-07-02T09:30:00Z"},"plan":"pro"}`}},
 			Call: func(ctx context.Context, c *ba.Client) (any, error) { return c.Tenant.Get(ctx) },
 			Check: func(t *testing.T, got any) {
 				s := got.(*ba.TenantSettings)
-				if s.Quota != nil || !s.MonetizationEnabled || s.Deletion == nil ||
+				if !s.MonetizationEnabled || s.Deletion == nil ||
 					!s.Deletion.DeletesAt.Equal(time.Date(2026, time.August, 1, 0, 0, 0, 0, time.UTC)) ||
 					!s.Deletion.RequestedAt.Equal(time.Date(2026, time.July, 2, 9, 30, 0, 0, time.UTC)) {
 					t.Fatalf("decoded %+v", s)
 				}
 			},
 		},
-		update("quota omitted", ba.UpdateTenantParams{Name: new("Acme Inc"), MonetizationEnabled: new(false)}, `{"name":"Acme Inc","monetizationEnabled":false}`),
-		update("quota null", ba.UpdateTenantParams{Quota: ba.Null[ba.QuotaInput]()}, `{"quota":null}`),
-		update("quota value with a null limit", ba.UpdateTenantParams{Quota: ba.Value(ba.QuotaInput{MonthlyRequestLimit: new(100), ResetDay: 1})},
-			`{"quota":{"monthlyTokenLimit":null,"monthlyRequestLimit":100,"resetDay":1}}`),
-		update("quota value with both limits", ba.UpdateTenantParams{MonetizationEnabled: new(true), Quota: ba.Value(ba.QuotaInput{MonthlyTokenLimit: new(5000000), MonthlyRequestLimit: new(10000), ResetDay: 28})},
-			`{"monetizationEnabled":true,"quota":{"monthlyTokenLimit":5000000,"monthlyRequestLimit":10000,"resetDay":28}}`),
+		update("name and monetization switch", ba.UpdateTenantParams{Name: new("Acme Inc"), MonetizationEnabled: new(false)}, `{"name":"Acme Inc","monetizationEnabled":false}`),
 		update("no field", ba.UpdateTenantParams{}, `{}`),
 	})
 }

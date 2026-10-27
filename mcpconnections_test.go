@@ -16,14 +16,11 @@ var (
 		return ba.CreateMCPConnectionParams{Name: "n", URL: "https://mcp.example.com", Auth: &ba.MCPAuthBearer{Token: ba.NewSecret(secret)}}
 	})
 	_ = testkit.RedactionCase("ReconnectMCPConnectionParams", func(secret string) any {
-		return ba.ReconnectMCPConnectionParams{URL: "https://mcp.example.com", Auth: ba.MCPAuthOAuthClientCredentials{ClientID: "c", ClientSecret: ba.NewSecret(secret)}}
+		return ba.ReconnectMCPConnectionParams{URL: "https://mcp.example.com", Auth: ba.MCPAuthOAuthAuthorizationCode{ClientSecret: ba.NewSecret(secret)}}
 	})
 	_ = testkit.RedactionCase("MCPAuthBearer", func(secret string) any { return ba.MCPAuthBearer{Token: ba.NewSecret(secret)} })
 	_ = testkit.RedactionCase("MCPAuthOAuthAuthorizationCode", func(secret string) any {
 		return ba.MCPAuthOAuthAuthorizationCode{ClientSecret: ba.NewSecret(secret)}
-	})
-	_ = testkit.RedactionCase("MCPAuthOAuthClientCredentials", func(secret string) any {
-		return ba.MCPAuthOAuthClientCredentials{ClientID: "c", ClientSecret: ba.NewSecret(secret)}
 	})
 )
 
@@ -106,10 +103,6 @@ func TestMCPConnectionsSmoke(t *testing.T) {
 		create(ba.MCPAuthOAuthAuthorizationCode{}, `{"name":"Docs","url":"https://mcp.example.com/mcp","authType":"oauth_authorization_code"}`),
 		create(ba.MCPAuthOAuthAuthorizationCode{ClientID: new("cid"), ClientSecret: ba.NewSecret("cs"), Scope: new("read")},
 			`{"name":"Docs","url":"https://mcp.example.com/mcp","authType":"oauth_authorization_code","clientId":"cid","clientSecret":"cs","scope":"read"}`),
-		create(ba.MCPAuthOAuthClientCredentials{ClientID: "cid", ClientSecret: ba.NewSecret("cs")},
-			`{"name":"Docs","url":"https://mcp.example.com/mcp","authType":"oauth_client_credentials","clientId":"cid","clientSecret":"cs"}`),
-		create(ba.MCPAuthOAuthClientCredentials{ClientID: "cid", ClientSecret: ba.NewSecret("cs"), Scope: new("a b")},
-			`{"name":"Docs","url":"https://mcp.example.com/mcp","authType":"oauth_client_credentials","clientId":"cid","clientSecret":"cs","scope":"a b"}`),
 		{
 			Name: "createMcpConnection nil auth",
 			Call: func(ctx context.Context, c *ba.Client) (any, error) {
@@ -190,7 +183,6 @@ func TestMCPConnectionsSmoke(t *testing.T) {
 		reconnect(ba.MCPAuthNone{}, `{"url":"https://mcp.example.com/mcp","authType":"none"}`),
 		reconnect(ba.MCPAuthBearer{Token: ba.NewSecret("tok-123456789")}, `{"url":"https://mcp.example.com/mcp","authType":"bearer","bearerToken":"tok-123456789"}`),
 		reconnect(ba.MCPAuthOAuthAuthorizationCode{Scope: new("s")}, `{"url":"https://mcp.example.com/mcp","authType":"oauth_authorization_code","scope":"s"}`),
-		reconnect(ba.MCPAuthOAuthClientCredentials{ClientID: "cid", ClientSecret: ba.NewSecret("cs")}, `{"url":"https://mcp.example.com/mcp","authType":"oauth_client_credentials","clientId":"cid","clientSecret":"cs"}`),
 		{Name: "reconnectMcpConnection unknown status", Exchanges: reconnectBody(`{"status":"pending_approval","ticket":"t1"}`), Call: reconnectCall, Unknown: true,
 			Check: func(t *testing.T, got any) {
 				if r := got.(*ba.MCPConnectionReconnectResult); r.Status != "pending_approval" || r.Connection.ID != "" {
