@@ -202,7 +202,7 @@ func TestSecretHoldersAreRedacted(t *testing.T) {
 			t.Errorf("%s is sent with a Secret but has no wire() method", name)
 		}
 	}
-	if len(listed) < 13 { // the walk itself must work: these are the holders the contract names
+	if len(listed) < 12 { // the walk itself must work: these are the holders the contract names
 		t.Fatalf("found only %v", listed)
 	}
 }

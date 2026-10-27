@@ -135,7 +135,6 @@ func TestUnionEdges(t *testing.T) {
 func TestEnumInitialisms(t *testing.T) {
 	for got, want := range map[string]string{
 		string(ba.MCPAuthTypeOAuthAuthorizationCode): "oauth_authorization_code",
-		string(ba.MCPAuthTypeOAuthClientCredentials): "oauth_client_credentials",
 		string(ba.ProviderTypeOpenRouter):            "openrouter",
 		string(ba.ProviderTypeVercelAIGateway):       "vercel_ai_gateway",
 		string(ba.ArchiveTypeTarGz):                  "tar.gz",

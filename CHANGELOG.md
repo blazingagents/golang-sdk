@@ -6,6 +6,31 @@
 
 - `AgentToolWebFetch` (`web_fetch`) joins the Agent tool catalog (`AgentTools`). It reads a public web page or text document by URL and returns markdown, and needs no Workspace. Like every tool it is off until you list it in `Tools`, and an approval policy can name it. `web_fetch` is now a reserved function name. The `web` group description now reads "Search the public web and read pages by URL."
 
+### Removed
+
+The platform has no production users yet, so both removals ship in one release without a deprecation step.
+
+- Tenant quotas. The API no longer has a monthly token or request limit on Tenant settings, so `TenantSettings.Quota`, `TenantQuota`, `QuotaInput`, `UpdateTenantParams.Quota` and `ErrorCodeQuotaExceeded` are gone. Delete the field from any update and stop handling `quota_exceeded`. Model spending limits (`client.SpendingLimits`) stay:
+
+  ```go
+  // Before
+  _, err := client.Tenant.Update(ctx, ba.UpdateTenantParams{
+  	Name:  new("Acme"),
+  	Quota: ba.Value(ba.QuotaInput{MonthlyTokenLimit: new(5000000), ResetDay: 1}),
+  })
+  // After
+  _, err := client.Tenant.Update(ctx, ba.UpdateTenantParams{Name: new("Acme")})
+  ```
+
+- The MCP connection `oauth_client_credentials` auth type. `MCPAuthOAuthClientCredentials` and `MCPAuthTypeOAuthClientCredentials` are gone. Connect the server with `MCPAuthBearer` and a token you issue, or with `MCPAuthOAuthAuthorizationCode`, which is saved as `needs_auth` until an administrator signs in from the dashboard and keeps its optional `ClientID`, `ClientSecret` and `Scope`:
+
+  ```go
+  // Before
+  auth := ba.MCPAuthOAuthClientCredentials{ClientID: "cid", ClientSecret: ba.NewSecret("cs")}
+  // After
+  auth := ba.MCPAuthBearer{Token: ba.NewSecret(token)}
+  ```
+
 ## 0.5.0 (2026-10-22)
 
 ### Removed

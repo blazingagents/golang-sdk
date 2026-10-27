@@ -14,7 +14,6 @@ const (
 	ErrorCodeValidationFailed                    ErrorCode = "validation_failed"
 	ErrorCodeUnauthorized                        ErrorCode = "unauthorized"
 	ErrorCodeNotFound                            ErrorCode = "not_found"
-	ErrorCodeQuotaExceeded                       ErrorCode = "quota_exceeded"
 	ErrorCodeModelSpendingLimitExceeded          ErrorCode = "model_spending_limit_exceeded"
 	ErrorCodeSubscriptionRequired                ErrorCode = "subscription_required"
 	ErrorCodeUsageCreditRequired                 ErrorCode = "usage_credit_required"

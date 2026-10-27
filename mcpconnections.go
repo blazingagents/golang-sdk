@@ -56,7 +56,7 @@ type MCPConnectionTest struct {
 }
 
 // MCPAuth is how a connection authenticates: MCPAuthNone, MCPAuthBearer,
-// MCPAuthOAuthAuthorizationCode or MCPAuthOAuthClientCredentials.
+// or MCPAuthOAuthAuthorizationCode.
 type MCPAuth interface{ isMCPAuth() }
 
 // MCPAuthNone sends no credentials.
@@ -72,17 +72,9 @@ type MCPAuthOAuthAuthorizationCode struct {
 	Scope        *string
 }
 
-// MCPAuthOAuthClientCredentials authorizes with OAuth client credentials.
-type MCPAuthOAuthClientCredentials struct {
-	ClientID     string
-	ClientSecret Secret
-	Scope        *string
-}
-
 func (MCPAuthNone) isMCPAuth()                   {}
 func (MCPAuthBearer) isMCPAuth()                 {}
 func (MCPAuthOAuthAuthorizationCode) isMCPAuth() {}
-func (MCPAuthOAuthClientCredentials) isMCPAuth() {}
 
 // CreateMCPConnectionParams is the body of createMcpConnection. Auth is required.
 type CreateMCPConnectionParams struct {
@@ -140,13 +132,6 @@ func mcpWire(body map[string]any, auth MCPAuth) (any, []string) {
 		if a.Scope != nil {
 			body["scope"] = *a.Scope
 		}
-	case MCPAuthOAuthClientCredentials:
-		body["authType"] = "oauth_client_credentials"
-		body["clientId"] = a.ClientID
-		reveal("clientSecret", a.ClientSecret)
-		if a.Scope != nil {
-			body["scope"] = *a.Scope
-		}
 	default: // a pointer to a variant
 		return invalidBody{&ArgumentError{Name: "params.Auth", Reason: fmt.Sprintf("%T is not an MCPAuth variant; pass the value", auth)}}, nil
 	}
@@ -159,10 +144,9 @@ func (s *MCPConnectionsService) List(ctx context.Context, opts ...RequestOption)
 	return list[MCPConnection]("mcpConnections")(s.s.send(ctx, op.ListMCPConnections(), nil, opts))
 }
 
-// Create adds an MCP connection. For MCPAuthNone, MCPAuthBearer and
-// MCPAuthOAuthClientCredentials the server checks the live server first and the result is
-// connected; MCPAuthOAuthAuthorizationCode saves it as needs_auth until an administrator
-// signs in from the dashboard. It sends createMcpConnection:
+// Create adds an MCP connection. For MCPAuthNone and MCPAuthBearer the server checks the
+// live server first and the result is connected; MCPAuthOAuthAuthorizationCode saves it as
+// needs_auth until an administrator signs in from the dashboard. It sends createMcpConnection:
 // https://docs.blazingagents.com/api-reference/rest-api/mcp-connections#create-mcp-connection
 func (s *MCPConnectionsService) Create(ctx context.Context, params CreateMCPConnectionParams, opts ...RequestOption) (*MCPConnection, error) {
 	return decode[MCPConnection](s.s.send(ctx, op.CreateMCPConnection(), params, opts))

@@ -83,7 +83,6 @@ const (
 	MCPAuthTypeBearer                 MCPAuthType = "bearer"
 	MCPAuthTypeNone                   MCPAuthType = "none"
 	MCPAuthTypeOAuthAuthorizationCode MCPAuthType = "oauth_authorization_code"
-	MCPAuthTypeOAuthClientCredentials MCPAuthType = "oauth_client_credentials"
 )
 
 // MCPConnectionErrorCode is a string enum of the API. A value this SDK does not list decodes as itself.
