@@ -151,13 +151,16 @@ func (e *ArgumentError) Error() string {
 func (e *ArgumentError) Unwrap() error { return e.Err }
 
 // CredentialEchoError is a 2xx response of a credential operation that contained a
-// credential field. The body is discarded.
+// credential field or echoed a submitted secret. The body is discarded.
 type CredentialEchoError struct {
 	OperationID string
 	RequestID   string
-	Field       string
+	Field       string // credential field name, or "" when a submitted secret was echoed
 }
 
 func (e *CredentialEchoError) Error() string {
+	if e.Field == "" {
+		return "blazingagents: " + e.OperationID + ": response echoed a submitted secret; body discarded"
+	}
 	return "blazingagents: " + e.OperationID + ": response echoed credential field " + e.Field + "; body discarded"
 }

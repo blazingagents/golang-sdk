@@ -144,6 +144,26 @@ func TestCredentialEcho(t *testing.T) {
 			t.Fatalf("%s: %v", body, err)
 		}
 	}
+	const secret = "sk-secret-abcdef"
+	createdID := testkit.ID(op.IDPatterns["ProviderID"])
+	echoed := `{"id":"` + createdID + `","name":"leak ` + secret + `","providerType":"openrouter","baseUrl":null,"keyFragment":"9f2c","createdAt":"2026-07-10T10:00:00.000Z","updatedAt":"2026-07-10T10:00:00.000Z"}`
+	m.Expect(testkit.Exchange{Op: "createProvider", Path: "/v1/providers", Status: 201,
+		Body:       `{"name":"Prod","providerType":"openrouter","apiKey":"` + secret + `"}`,
+		RespHeader: http.Header{"X-Request-Id": {"r2"}}, RespBody: echoed})
+	got, err := c.Providers.Create(context.Background(), ba.CreateProviderParams{
+		Name: "Prod", ProviderType: ba.ProviderTypeOpenRouter, APIKey: ba.NewSecret(secret),
+	})
+	if ce := (*ba.CredentialEchoError)(nil); !errors.As(err, &ce) || got != nil || ce.Field != "" || ce.RequestID != "r2" {
+		t.Fatalf("submitted secret echo: got=%v err=%v", got, err)
+	}
+	short := `{"id":"` + createdID + `","name":"the key9f2c provider","providerType":"openrouter","baseUrl":null,"keyFragment":"9f2c","createdAt":"2026-07-10T10:00:00.000Z","updatedAt":"2026-07-10T10:00:00.000Z"}`
+	m.Expect(testkit.Exchange{Op: "createProvider", Path: "/v1/providers", Status: 201,
+		Body: `{"name":"Prod","providerType":"openrouter","apiKey":"key"}`, RespBody: short})
+	if _, err := c.Providers.Create(context.Background(), ba.CreateProviderParams{
+		Name: "Prod", ProviderType: ba.ProviderTypeOpenRouter, APIKey: ba.NewSecret("key"),
+	}); err != nil {
+		t.Fatalf("short secret substring: %v", err)
+	}
 	// Not CredentialBearing: the same key is not inspected.
 	m.Expect(testkit.Exchange{Op: "getMemory", Path: "/v1/agents/a/memories/m", RespBody: `{"memory":{"id":"m","apiKey":"x"}}`})
 	if _, err := c.Memories.Get(context.Background(), "a", "m"); err != nil {

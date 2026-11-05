@@ -64,7 +64,7 @@ func (t *transport) send(ctx context.Context, r op.Request, params any, opts []R
 		return nil, c.connectionError(err) // never a DecodeError
 	}
 	if r.Op.CredentialBearing {
-		if err := rejectCredentialEcho(data, c.meta); err != nil {
+		if err := rejectCredentialEcho(data, c.meta, c.secrets); err != nil {
 			return nil, err
 		}
 	}
@@ -372,13 +372,16 @@ var credentialKeys = map[string]bool{
 	"credential": true,
 }
 
-func rejectCredentialEcho(data []byte, meta ResponseMeta) error {
+func rejectCredentialEcho(data []byte, meta ResponseMeta, secrets []string) error {
 	var v any
 	if json.Unmarshal(data, &v) != nil {
 		return nil // not JSON: decoding reports it
 	}
 	if key, ok := findCredentialKey(v); ok {
 		return &CredentialEchoError{OperationID: meta.OperationID, RequestID: meta.RequestID, Field: key}
+	}
+	if containsSubmittedSecret(v, secrets) {
+		return &CredentialEchoError{OperationID: meta.OperationID, RequestID: meta.RequestID}
 	}
 	return nil
 }
@@ -402,6 +405,38 @@ func findCredentialKey(v any) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// containsSubmittedSecret reports whether v holds a submitted secret: anywhere when the
+// secret is 8 bytes or longer, else only as the whole string.
+func containsSubmittedSecret(v any, secrets []string) bool {
+	switch v := v.(type) {
+	case string:
+		for _, sec := range secrets {
+			switch {
+			case sec == "":
+			case len(sec) >= 8:
+				if strings.Contains(v, sec) {
+					return true
+				}
+			case v == sec:
+				return true
+			}
+		}
+	case map[string]any:
+		for _, x := range v {
+			if containsSubmittedSecret(x, secrets) {
+				return true
+			}
+		}
+	case []any:
+		for _, x := range v {
+			if containsSubmittedSecret(x, secrets) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // expandPath fills the path template, rejecting "", "." and ".." and escaping every byte
