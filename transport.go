@@ -64,7 +64,7 @@ func (t *transport) send(ctx context.Context, r op.Request, params any, opts []R
 		return nil, c.connectionError(err) // never a DecodeError
 	}
 	if r.Op.CredentialBearing {
-		if err := rejectCredentialEcho(data, c.meta); err != nil {
+		if err := rejectCredentialEcho(data, c.meta, c.secrets); err != nil {
 			return nil, err
 		}
 	}
@@ -324,14 +324,28 @@ func retryAfter(v string) (time.Duration, bool) {
 	return 0, false
 }
 
-// redactString hides each secret: anywhere when it is 8 bytes or longer, else only as the whole value.
+// secretIn reports whether s holds sec: anywhere when sec is 8 bytes or longer, else only as the
+// whole string. An empty sec is never found.
+func secretIn(s, sec string) bool {
+	switch {
+	case sec == "":
+		return false
+	case len(sec) >= 8:
+		return strings.Contains(s, sec)
+	default:
+		return s == sec
+	}
+}
+
+// redactString hides each secret that secretIn finds in s.
 func redactString(s string, secrets []string) string {
 	for _, sec := range secrets {
-		switch {
-		case sec == "":
-		case len(sec) >= 8:
+		if !secretIn(s, sec) {
+			continue
+		}
+		if len(sec) >= 8 {
 			s = strings.ReplaceAll(s, sec, redacted)
-		case s == sec:
+		} else {
 			s = redacted
 		}
 	}
@@ -372,13 +386,16 @@ var credentialKeys = map[string]bool{
 	"credential": true,
 }
 
-func rejectCredentialEcho(data []byte, meta ResponseMeta) error {
+func rejectCredentialEcho(data []byte, meta ResponseMeta, secrets []string) error {
 	var v any
 	if json.Unmarshal(data, &v) != nil {
 		return nil // not JSON: decoding reports it
 	}
 	if key, ok := findCredentialKey(v); ok {
 		return &CredentialEchoError{OperationID: meta.OperationID, RequestID: meta.RequestID, Field: key}
+	}
+	if containsSubmittedSecret(v, secrets) {
+		return &CredentialEchoError{OperationID: meta.OperationID, RequestID: meta.RequestID}
 	}
 	return nil
 }
@@ -402,6 +419,31 @@ func findCredentialKey(v any) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// containsSubmittedSecret reports whether any string in v holds a submitted secret, per secretIn.
+func containsSubmittedSecret(v any, secrets []string) bool {
+	switch v := v.(type) {
+	case string:
+		for _, sec := range secrets {
+			if secretIn(v, sec) {
+				return true
+			}
+		}
+	case map[string]any:
+		for _, x := range v {
+			if containsSubmittedSecret(x, secrets) {
+				return true
+			}
+		}
+	case []any:
+		for _, x := range v {
+			if containsSubmittedSecret(x, secrets) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // expandPath fills the path template, rejecting "", "." and ".." and escaping every byte
