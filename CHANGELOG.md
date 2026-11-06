@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A credential-bearing call now fails with `CredentialEchoError` (empty `Field`)
+  when the response contains a submitted secret: anywhere for secrets of 8+
+  bytes, as the whole string for shorter ones. Previously only credential field
+  names were checked.
+
 ## 0.6.0 (2026-10-27)
 
 ### Added
