@@ -116,6 +116,20 @@ func TestErrorRedaction(t *testing.T) {
 	}
 }
 
+func TestOverlappingSecretRedaction(t *testing.T) {
+	const prefix, full = "sk-secret", "sk-secret-EXTRA"
+	m := testkit.New(t)
+	m.Expect(testkit.Exchange{Op: "createChatConnection", Path: "/v1/chat-connections", Status: 400,
+		BodyFunc: func([]byte) error { return nil },
+		RespBody: `{"error":{"code":"validation_failed","message":"bad ` + full + `"}}`})
+	_, err := m.Client().ChatConnections.Create(context.Background(), ba.SlackConnection{
+		Name: "n", Credentials: ba.SlackCredentials{BotToken: ba.NewSecret(prefix), SigningSecret: ba.NewSecret(full)},
+	})
+	if err == nil || strings.Contains(err.Error(), "EXTRA") || strings.Contains(err.Error(), prefix) {
+		t.Fatalf("redaction %v", err)
+	}
+}
+
 func TestErrorTypes(t *testing.T) {
 	inner := errors.New("inner")
 	for _, tc := range []struct {

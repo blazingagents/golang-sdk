@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Error redaction now hides a longer submitted secret before a shorter one that is its prefix. Replacing the prefix first left the rest of the longer secret in the error text.
+
 - A credential-bearing call now fails with `CredentialEchoError` (empty `Field`)
   when the response contains a submitted secret: anywhere for secrets of 8+
   bytes, as the whole string for shorter ones. Previously only credential field

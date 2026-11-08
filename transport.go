@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -337,8 +338,14 @@ func secretIn(s, sec string) bool {
 	}
 }
 
-// redactString hides each secret that secretIn finds in s.
+// redactString hides each secret that secretIn finds in s. Longer secrets are
+// hidden first so a shorter secret that is a prefix of another does not leave
+// the rest of the longer one visible.
 func redactString(s string, secrets []string) string {
+	if len(secrets) > 1 {
+		secrets = slices.Clone(secrets)
+		slices.SortStableFunc(secrets, func(a, b string) int { return len(b) - len(a) })
+	}
 	for _, sec := range secrets {
 		if !secretIn(s, sec) {
 			continue
