@@ -145,12 +145,18 @@ var errNoSessionIDs = &ArgumentError{Name: "params.SessionIDs", Reason: "empty; 
 // getUsageOverview:
 // https://docs.blazingagents.com/api-reference/rest-api/usage#get-usage-overview
 func (s *UsageService) Overview(ctx context.Context, params UsageOverviewParams, opts ...RequestOption) (*UsageOverview, error) {
+	if err := params.DateRange.check(); err != nil {
+		return nil, err
+	}
 	return decode[UsageOverview](s.s.send(ctx, op.GetUsageOverview(), params, opts))
 }
 
 // Get returns usage: the tenant's on a Client, this user's on a UserClient. It sends getUsage:
 // https://docs.blazingagents.com/api-reference/rest-api/usage#get-usage
 func (s *UserUsageService) Get(ctx context.Context, params UsageParams, opts ...RequestOption) (*Usage, error) {
+	if err := params.DateRange.check(); err != nil {
+		return nil, err
+	}
 	return decode[Usage](s.s.send(ctx, op.GetUsage(), params, opts))
 }
 
@@ -158,6 +164,9 @@ func (s *UserUsageService) Get(ctx context.Context, params UsageParams, opts ...
 // user's. It sends getSessionUsage:
 // https://docs.blazingagents.com/api-reference/rest-api/usage#get-session-usage
 func (s *UserUsageService) Sessions(ctx context.Context, params SessionUsageParams, opts ...RequestOption) (*SessionUsage, error) {
+	if err := params.DateRange.check(); err != nil {
+		return nil, err
+	}
 	if len(params.SessionIDs) == 0 {
 		return nil, errNoSessionIDs
 	}
@@ -168,5 +177,8 @@ func (s *UserUsageService) Sessions(ctx context.Context, params SessionUsagePara
 // exist, has zero totals and no buckets. It sends getAgentUsage:
 // https://docs.blazingagents.com/api-reference/rest-api/usage#get-agent-usage
 func (s *UserUsageService) ForAgent(ctx context.Context, agentID AgentID, params AgentUsageParams, opts ...RequestOption) (*Usage, error) {
+	if err := params.DateRange.check(); err != nil {
+		return nil, err
+	}
 	return decode[Usage](s.s.send(ctx, op.GetAgentUsage(string(agentID)), params, opts))
 }

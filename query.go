@@ -80,7 +80,11 @@ func queryValue(v reflect.Value) (string, bool) {
 	}
 	switch v.Type() {
 	case dateType:
-		return v.Interface().(Date).String(), true
+		d := v.Interface().(Date)
+		if d.IsZero() {
+			return "", false
+		}
+		return d.String(), true
 	case timeType:
 		return v.Interface().(time.Time).UTC().Format(time.RFC3339Nano), true
 	}

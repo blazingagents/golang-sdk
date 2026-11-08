@@ -223,3 +223,21 @@ func TestUsageErrors(t *testing.T) {
 			return err
 		})
 }
+
+func TestUsageZeroDateRange(t *testing.T) {
+	session := ba.SessionID(testkit.ID(op.IDPatterns["SessionID"]))
+	m := testkit.New(t)
+	m.Expect(testkit.Exchange{Op: "getUsage", Path: "/v1/usage", RespBody: testkit.Example("getUsage", 200)})
+	if _, err := m.Client().Usage.Get(context.Background(), ba.UsageParams{DateRange: &ba.DateRange{}}); err != nil {
+		t.Fatal(err)
+	}
+	m.Expect(testkit.Exchange{Op: "getSessionUsage", Path: "/v1/usage/sessions",
+		Body: `{"sessionIds":["` + string(session) + `"]}`, RespBody: testkit.Example("getSessionUsage", 200)})
+	if _, err := m.Client().Usage.Sessions(context.Background(), ba.SessionUsageParams{SessionIDs: []ba.SessionID{session}, DateRange: &ba.DateRange{}}); err != nil {
+		t.Fatal(err)
+	}
+	_, err := m.Client().Usage.Get(context.Background(), ba.UsageParams{DateRange: &ba.DateRange{From: ba.Date{Year: 2026, Month: time.July, Day: 1}}})
+	if err == nil || err.Error() != "blazingagents: invalid argument params.DateRange: from and to must both be set or both be left unset" {
+		t.Fatalf("one side: %v", err)
+	}
+}

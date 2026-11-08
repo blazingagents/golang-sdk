@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- A zero `Date` is no longer sent as `0000-00-00`. An empty `DateRange` omits both bounds, the same as nil, and a range with only one bound is rejected before the request is sent.
+
 - A credential-bearing call now fails with `CredentialEchoError` (empty `Field`)
   when the response contains a submitted secret: anywhere for secrets of 8+
   bytes, as the whole string for shorter ones. Previously only credential field

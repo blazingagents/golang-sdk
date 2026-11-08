@@ -15,6 +15,10 @@ type Date struct {
 
 func (d Date) String() string { return fmt.Sprintf("%04d-%02d-%02d", d.Year, d.Month, d.Day) }
 
+// IsZero reports whether d is the zero Date. That value is not a calendar day;
+// String would format it as 0000-00-00.
+func (d Date) IsZero() bool { return d == Date{} }
+
 func (d Date) MarshalJSON() ([]byte, error) { return json.Marshal(d.String()) }
 
 func (d *Date) UnmarshalJSON(b []byte) error {
@@ -31,7 +35,15 @@ func (d *Date) UnmarshalJSON(b []byte) error {
 }
 
 // DateRange is an inclusive range of UTC days. Params embed *DateRange; nil sends neither bound.
+// A zero From or To is unset. Set both or neither: one side alone is not a range.
 type DateRange struct {
-	From Date `json:"from" query:"from"`
-	To   Date `json:"to" query:"to"`
+	From Date `json:"from,omitzero" query:"from"`
+	To   Date `json:"to,omitzero" query:"to"`
+}
+
+func (r *DateRange) check() error {
+	if r == nil || r.From.IsZero() == r.To.IsZero() {
+		return nil
+	}
+	return &ArgumentError{Name: "params.DateRange", Reason: "from and to must both be set or both be left unset"}
 }
