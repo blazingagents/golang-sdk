@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Decoding a user message now rejects JSON `null` for a part `type`, text, `mediaType`, `url`, or `filename`. `encoding/json` accepts `null` into a Go string and leaves it empty, so those parts were decoded and could be sent again as `""`.
+
 - A credential-bearing call now fails with `CredentialEchoError` (empty `Field`)
   when the response contains a submitted secret: anywhere for secrets of 8+
   bytes, as the whole string for shorter ones. Previously only credential field

@@ -384,13 +384,18 @@ func TestUserMessageJSON(t *testing.T) {
 		t.Fatalf("TextMessage %#v", tm)
 	}
 	for body, want := range map[string]string{
-		`{"id":"m","role":"assistant","parts":[{"type":"text","text":"a"}]}`:                        `blazingagents: message role must be "user"`,
-		`{"id":"","role":"user","parts":[{"type":"text","text":"a"}]}`:                              "blazingagents: message id must be a non-empty string",
-		`{"id":"m","role":"user","parts":[]}`:                                                       "blazingagents: message parts must be a non-empty array",
-		`{"id":"m","role":"user","parts":[{"text":"a"}]}`:                                           "blazingagents: message part type must be a string",
-		`{"id":"m","role":"user","parts":[{"type":"text"}]}`:                                        "blazingagents: text part needs a string text",
-		`{"id":"m","role":"user","parts":[{"type":"file","url":"u"}]}`:                              "blazingagents: file part needs string mediaType and url",
-		`{"id":"m","role":"user","parts":[{"type":"file","mediaType":"a","url":"u","filename":1}]}`: "blazingagents: file part needs string mediaType and url",
+		`{"id":"m","role":"assistant","parts":[{"type":"text","text":"a"}]}`:                           `blazingagents: message role must be "user"`,
+		`{"id":"","role":"user","parts":[{"type":"text","text":"a"}]}`:                                 "blazingagents: message id must be a non-empty string",
+		`{"id":"m","role":"user","parts":[]}`:                                                          "blazingagents: message parts must be a non-empty array",
+		`{"id":"m","role":"user","parts":[{"text":"a"}]}`:                                              "blazingagents: message part type must be a string",
+		`{"id":"m","role":"user","parts":[{"type":"text"}]}`:                                           "blazingagents: text part needs a string text",
+		`{"id":"m","role":"user","parts":[{"type":"text","text":null}]}`:                               "blazingagents: text part needs a string text",
+		`{"id":"m","role":"user","parts":[{"type":null}]}`:                                             "blazingagents: message part type must be a string",
+		`{"id":"m","role":"user","parts":[{"type":"file","url":"u"}]}`:                                 "blazingagents: file part needs string mediaType and url",
+		`{"id":"m","role":"user","parts":[{"type":"file","mediaType":null,"url":"u"}]}`:                "blazingagents: file part needs string mediaType and url",
+		`{"id":"m","role":"user","parts":[{"type":"file","mediaType":"a","url":null}]}`:                "blazingagents: file part needs string mediaType and url",
+		`{"id":"m","role":"user","parts":[{"type":"file","mediaType":"a","url":"u","filename":null}]}`: "blazingagents: file part needs string mediaType and url",
+		`{"id":"m","role":"user","parts":[{"type":"file","mediaType":"a","url":"u","filename":1}]}`:    "blazingagents: file part needs string mediaType and url",
 	} {
 		var m ba.UserMessage
 		if err := json.Unmarshal([]byte(body), &m); err == nil || err.Error() != want {

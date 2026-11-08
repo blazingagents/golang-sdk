@@ -1,6 +1,7 @@
 package blazingagents
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -144,10 +145,27 @@ func marshalPart(extra map[string]json.RawMessage, fields map[string]any) ([]byt
 	return json.Marshal(fields)
 }
 
+// decodeJSONString reads a JSON string. Missing and null are not strings: encoding/json
+// accepts null into a Go string and leaves it empty.
+func decodeJSONString(raw json.RawMessage) (string, bool) {
+	raw = bytes.TrimSpace(raw)
+	if len(raw) == 0 || bytes.Equal(raw, []byte("null")) {
+		return "", false
+	}
+	var s string
+	if json.Unmarshal(raw, &s) != nil {
+		return "", false
+	}
+	return s, true
+}
+
 func decodeUserPart(raw json.RawMessage) (UserPart, error) {
 	var obj map[string]json.RawMessage
-	var typ string
-	if json.Unmarshal(raw, &obj) != nil || json.Unmarshal(obj["type"], &typ) != nil {
+	if json.Unmarshal(raw, &obj) != nil {
+		return nil, errPartType
+	}
+	typ, ok := decodeJSONString(obj["type"])
+	if !ok {
 		return nil, errPartType
 	}
 	extra := func(known ...string) map[string]json.RawMessage {
@@ -161,22 +179,25 @@ func decodeUserPart(raw json.RawMessage) (UserPart, error) {
 	}
 	switch typ {
 	case "text":
-		var p TextPart
-		if json.Unmarshal(obj["text"], &p.Text) != nil {
+		text, ok := decodeJSONString(obj["text"])
+		if !ok {
 			return nil, errTextPart
 		}
-		p.extra = extra("text")
-		return p, nil
+		return TextPart{Text: text, extra: extra("text")}, nil
 	case "file":
-		var p FilePart
-		if json.Unmarshal(obj["mediaType"], &p.MediaType) != nil || json.Unmarshal(obj["url"], &p.URL) != nil {
+		media, okMedia := decodeJSONString(obj["mediaType"])
+		url, okURL := decodeJSONString(obj["url"])
+		if !okMedia || !okURL {
 			return nil, errFilePart
 		}
-		if f, ok := obj["filename"]; ok && json.Unmarshal(f, &p.Filename) != nil {
-			return nil, errFilePart
+		var name string
+		if f, ok := obj["filename"]; ok {
+			name, ok = decodeJSONString(f)
+			if !ok {
+				return nil, errFilePart
+			}
 		}
-		p.extra = extra("mediaType", "url", "filename")
-		return p, nil
+		return FilePart{MediaType: media, URL: url, Filename: name, extra: extra("mediaType", "url", "filename")}, nil
 	}
 	return UnknownPart{Type: typ, Raw: append(json.RawMessage(nil), raw...)}, nil
 }
