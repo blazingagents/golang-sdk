@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- A chat stream now ends an event on any SSE blank line: LF, CR, or CRLF, in either order. A frame that ended with LF then CRLF, or two CRs, was reported as an incomplete stream and dropped.
+
 - A credential-bearing call now fails with `CredentialEchoError` (empty `Field`)
   when the response contains a submitted secret: anywhere for secrets of 8+
   bytes, as the whole string for shorter ones. Previously only credential field

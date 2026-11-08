@@ -46,6 +46,26 @@ func chatDrain(t *testing.T, s *ba.ChatStream) ([]string, error) {
 	return out, nil
 }
 
+func TestChatMixedBlankLine(t *testing.T) {
+	ids := newChatIDs()
+	m := testkit.New(t)
+	// LF+CRLF and CR+CR are blank lines. A parser that only splits on LF LF or CRLF CRLF
+	// reports the stream incomplete and drops both events.
+	m.Expect(testkit.Exchange{Op: "createSessionTurn", Path: "/v1/agents/" + string(ids.agent) + "/sessions", RespHeader: ids.created(),
+		Body: `{"messages":[` + chatMessage + `],"trigger":"submit-message"}`, Status: 201,
+		SSE: []string{"data: one\n\r\ndata: two\r\r"}})
+	stream, err := m.Client().Chat.Send(context.Background(), ids.agent, chatInput(), ba.ChatParams{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stream.Close()
+	events, err := chatDrain(t, stream)
+	want := []string{"data: one\n\r\n", "data: two\r\r"}
+	if err != nil || strings.Join(events, "|") != strings.Join(want, "|") {
+		t.Fatalf("events %q, %v", events, err)
+	}
+}
+
 func TestChatSendCreatesASession(t *testing.T) {
 	ids := newChatIDs()
 	m := testkit.New(t)
