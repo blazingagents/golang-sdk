@@ -24,6 +24,7 @@ const (
 	ErrorCodeSubscriptionNotCancelled            ErrorCode = "subscription_not_cancelled"
 	ErrorCodeAgentDisabled                       ErrorCode = "agent_disabled"
 	ErrorCodeAgentBusy                           ErrorCode = "agent_busy"
+	ErrorCodeAgentDeleting                       ErrorCode = "agent_deleting"
 	ErrorCodeAdminAgentManaged                   ErrorCode = "admin_agent_managed"
 	ErrorCodeAgentMCPConnectionNotFound          ErrorCode = "agent_mcp_connection_not_found"
 	ErrorCodeAgentMCPConnectionsInvalid          ErrorCode = "agent_mcp_connections_invalid"
