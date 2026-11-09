@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- `ErrorCodeAgentDeleting` (`agent_deleting`). While a delete of an agent that
+  also deletes its artifacts runs, a new chat turn, resume, tool-approval
+  continuation, generation or task run for that agent fails with
+  `409 agent_deleting`. If that delete failed, the agent keeps refusing work
+  until you send the delete again, which finishes it.
+
 ### Fixed
 
 - A credential-bearing call now fails with `CredentialEchoError` (empty `Field`)
