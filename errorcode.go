@@ -51,6 +51,7 @@ const (
 	ErrorCodeMCPConnectionInUse                  ErrorCode = "mcp_connection_in_use"
 	ErrorCodeMCPConnectionUnreachable            ErrorCode = "mcp_connection_unreachable"
 	ErrorCodeMCPConnectionDiscoveryFailed        ErrorCode = "mcp_connection_discovery_failed"
+	ErrorCodeMCPConnectionNeedsAuth              ErrorCode = "mcp_connection_needs_auth"
 	ErrorCodeWorkspaceNotFound                   ErrorCode = "workspace_not_found"
 	ErrorCodeWorkspaceInUse                      ErrorCode = "workspace_in_use"
 	ErrorCodeWorkspaceBusy                       ErrorCode = "workspace_busy"
