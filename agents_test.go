@@ -73,7 +73,7 @@ func TestAgentsRequests(t *testing.T) {
 			Name: "createAgent sends every field",
 			Exchanges: []testkit.Exchange{{Op: "createAgent", Path: "/v1/agents", Status: 201, NoHeader: agentsNoUser,
 				Body: `{"workspaceTier":"plus","approvalInChat":{"default":"manual"},"approvalInTasks":{"default":"auto","overrides":[]},` +
-					`"name":"Support Agent","model":"openai/gpt-6-luna","thinkingLevel":"high","providerId":"` + string(prv) + `",` +
+					`"name":"Support Agent","model":"openai/gpt-6-luna","thinkingLevel":"high","providerId":"` + string(prv) + `","autoApprovalModel":"openai/gpt-6-luna-mini",` +
 					`"autoCompaction":false,"compactionReserveTokens":0,"memoryInjectionEnabled":true,"tools":["read","web_search"],` +
 					`"instructions":"","userId":"","metadata":{"team":"support"},"mcpConnectionIds":["` + string(mcp) + `"]}`,
 				RespBody: testkit.Example("createAgent", 201)}},
@@ -86,6 +86,7 @@ func TestAgentsRequests(t *testing.T) {
 					Model:                   ba.Value("openai/gpt-6-luna"),
 					ThinkingLevel:           ba.Value("high"),
 					ProviderID:              ba.Value(prv),
+					AutoApprovalModel:       ba.Value("openai/gpt-6-luna-mini"),
 					AutoCompaction:          new(false),
 					CompactionReserveTokens: new(0),
 					MemoryInjectionEnabled:  new(true),
@@ -125,7 +126,7 @@ func TestAgentsRequests(t *testing.T) {
 			Name: "updateAgent sends every field",
 			Exchanges: []testkit.Exchange{{Op: "updateAgent", Path: path, NoHeader: agentsNoUser,
 				Body: `{"approvalInChat":{"default":"deny"},"approvalInTasks":{"default":"full"},"name":"v2","model":"m","thinkingLevel":"low",` +
-					`"providerId":"` + string(prv) + `","workspaceId":"` + string(ws) + `","autoCompaction":true,"compactionReserveTokens":5,` +
+					`"providerId":"` + string(prv) + `","autoApprovalModel":null,"workspaceId":"` + string(ws) + `","autoCompaction":true,"compactionReserveTokens":5,` +
 					`"memoryInjectionEnabled":false,"tools":["bash"],"instructions":"Be brief.","metadata":{"k":1},"mcpConnectionIds":["` + string(mcp) + `"]}`,
 				RespBody: testkit.Example("updateAgent", 200)}},
 			Call: func(ctx context.Context, c *ba.Client) (any, error) {
@@ -136,6 +137,7 @@ func TestAgentsRequests(t *testing.T) {
 					Model:                   ba.Value("m"),
 					ThinkingLevel:           ba.Value("low"),
 					ProviderID:              ba.Value(prv),
+					AutoApprovalModel:       ba.Null[string](),
 					WorkspaceID:             &ws,
 					AutoCompaction:          new(true),
 					CompactionReserveTokens: new(5),
@@ -310,7 +312,7 @@ func TestAgentsDecode(t *testing.T) {
 	body := func(over map[string]any) string {
 		m := map[string]any{
 			"id": id, "tenantId": ten, "name": "Support", "model": "m", "thinkingLevel": "high", "providerId": prv,
-			"workspaceId": ws, "autoCompaction": true, "compactionReserveTokens": 9007199254740991, "memoryInjectionEnabled": true,
+			"autoApprovalModel": "m-review", "workspaceId": ws, "autoCompaction": true, "compactionReserveTokens": 9007199254740991, "memoryInjectionEnabled": true,
 			"tools": []string{"read", "teleport"}, "instructions": "Be brief.", "userId": "u1", "metadata": map[string]any{"n": 1},
 			"mcpConnectionIds": []any{mcp}, "avatarUrl": "https://cdn.example/a.png",
 			"approvalInChat": map[string]any{"default": "manual", "overrides": []any{}}, "approvalInTasks": map[string]any{"default": "later"},
@@ -330,7 +332,7 @@ func TestAgentsDecode(t *testing.T) {
 			Check: func(t *testing.T, got any) {
 				a := got.(*ba.Agent)
 				want := &ba.Agent{
-					ID: id, TenantID: ten, Name: "Support", Model: new("m"), ThinkingLevel: new("high"), ProviderID: &prv, WorkspaceID: ws,
+					ID: id, TenantID: ten, Name: "Support", Model: new("m"), ThinkingLevel: new("high"), ProviderID: &prv, AutoApprovalModel: new("m-review"), WorkspaceID: ws,
 					ApprovalInChat:  &ba.ApprovalPolicy{Default: ba.ApprovalModeManual, Overrides: []ba.ApprovalOverride{}},
 					ApprovalInTasks: &ba.ApprovalPolicy{Default: "later"},
 					AutoCompaction:  true, CompactionReserveTokens: 9007199254740991, MemoryInjectionEnabled: true,
@@ -349,10 +351,10 @@ func TestAgentsDecode(t *testing.T) {
 		},
 		{
 			Name:      "nulls decode as nil",
-			Exchanges: []testkit.Exchange{{Op: "getAgent", Path: path, RespBody: body(map[string]any{"model": nil, "thinkingLevel": nil, "providerId": nil, "avatarUrl": nil})}},
+			Exchanges: []testkit.Exchange{{Op: "getAgent", Path: path, RespBody: body(map[string]any{"model": nil, "thinkingLevel": nil, "providerId": nil, "autoApprovalModel": nil, "avatarUrl": nil})}},
 			Call:      get,
 			Check: func(t *testing.T, got any) {
-				if a := got.(*ba.Agent); a.Model != nil || a.ThinkingLevel != nil || a.ProviderID != nil || a.AvatarURL != nil {
+				if a := got.(*ba.Agent); a.Model != nil || a.ThinkingLevel != nil || a.ProviderID != nil || a.AutoApprovalModel != nil || a.AvatarURL != nil {
 					t.Fatalf("agent %#v", a)
 				}
 			},
@@ -481,12 +483,19 @@ func TestAgentsModelFields(t *testing.T) {
 			ba.CreateAgentParams{ProviderID: ba.Value(prv), Model: ba.Value("m"), ThinkingLevel: ba.Value("high")}),
 		create(`,"thinkingLevel":"high"`, ba.CreateAgentParams{ThinkingLevel: ba.Value("high")}),
 		create(`,"thinkingLevel":null`, ba.CreateAgentParams{ThinkingLevel: ba.Null[string]()}),
+		create(`,"model":"m","providerId":"`+string(prv)+`","autoApprovalModel":"review"`,
+			ba.CreateAgentParams{ProviderID: ba.Value(prv), Model: ba.Value("m"), AutoApprovalModel: ba.Value("review")}),
+		create(`,"autoApprovalModel":null`, ba.CreateAgentParams{AutoApprovalModel: ba.Null[string]()}),
 		update(``, ba.UpdateAgentParams{}),
 		update(pair, ba.UpdateAgentParams{ProviderID: ba.Value(prv), Model: ba.Value("m")}),
 		update(`,"model":"m"`, ba.UpdateAgentParams{Model: ba.Value("m")}),
 		update(`,"model":"m","thinkingLevel":null`, ba.UpdateAgentParams{Model: ba.Value("m"), ThinkingLevel: ba.Null[string]()}),
 		update(`,"thinkingLevel":"low"`, ba.UpdateAgentParams{ThinkingLevel: ba.Value("low")}),
 		update(`,"thinkingLevel":null`, ba.UpdateAgentParams{ThinkingLevel: ba.Null[string]()}),
+		update(`,"autoApprovalModel":"review"`, ba.UpdateAgentParams{AutoApprovalModel: ba.Value("review")}),
+		update(`,"autoApprovalModel":null`, ba.UpdateAgentParams{AutoApprovalModel: ba.Null[string]()}),
+		update(`,"model":"m","providerId":"`+string(prv)+`","autoApprovalModel":"review"`,
+			ba.UpdateAgentParams{ProviderID: ba.Value(prv), Model: ba.Value("m"), AutoApprovalModel: ba.Value("review")}),
 		update(`,"model":"m","thinkingLevel":"max","providerId":"`+string(prv)+`"`,
 			ba.UpdateAgentParams{ProviderID: ba.Value(prv), Model: ba.Value("m"), ThinkingLevel: ba.Value("max")}),
 	})
@@ -500,6 +509,7 @@ func TestAgentsModelPairing(t *testing.T) {
 		createPair = "blazingagents: invalid argument params.ProviderID: ProviderID and Model must both be omitted, both be set, or both be Null"
 		updatePair = "blazingagents: invalid argument params.ProviderID: ProviderID and Model must both be set or both be Null; Model alone changes the model on the current provider"
 		thinking   = "blazingagents: invalid argument params.ThinkingLevel: a thinking level needs a provider, but ProviderID is Null"
+		autoModel  = "blazingagents: invalid argument params.AutoApprovalModel: an auto-approval model needs a provider, but ProviderID is Null"
 	)
 	nullP, nullM := ba.Null[ba.ProviderID](), ba.Null[string]()
 	for _, tc := range []struct {
@@ -515,12 +525,14 @@ func TestAgentsModelPairing(t *testing.T) {
 		{name: "create Null ProviderID with a Model", create: &ba.CreateAgentParams{ProviderID: nullP, Model: ba.Value("m")}, want: createPair},
 		{name: "create ProviderID with a Null Model", create: &ba.CreateAgentParams{ProviderID: ba.Value(prv), Model: nullM}, want: createPair},
 		{name: "create ThinkingLevel with Null provider", create: &ba.CreateAgentParams{ProviderID: nullP, Model: nullM, ThinkingLevel: ba.Value("high")}, want: thinking},
+		{name: "create AutoApprovalModel with Null provider", create: &ba.CreateAgentParams{ProviderID: nullP, Model: nullM, AutoApprovalModel: ba.Value("r")}, want: autoModel},
 		{name: "update ProviderID alone", update: &ba.UpdateAgentParams{ProviderID: ba.Value(prv)}, want: updatePair},
 		{name: "update Null ProviderID alone", update: &ba.UpdateAgentParams{ProviderID: nullP}, want: updatePair},
 		{name: "update Null Model alone", update: &ba.UpdateAgentParams{Model: nullM}, want: updatePair},
 		{name: "update Null ProviderID with a Model", update: &ba.UpdateAgentParams{ProviderID: nullP, Model: ba.Value("m")}, want: updatePair},
 		{name: "update ProviderID with a Null Model", update: &ba.UpdateAgentParams{ProviderID: ba.Value(prv), Model: nullM}, want: updatePair},
 		{name: "update ThinkingLevel with Null provider", update: &ba.UpdateAgentParams{ProviderID: nullP, Model: nullM, ThinkingLevel: ba.Value("high")}, want: thinking},
+		{name: "update AutoApprovalModel with Null provider", update: &ba.UpdateAgentParams{ProviderID: nullP, Model: nullM, AutoApprovalModel: ba.Value("r")}, want: autoModel},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			c := testkit.New(t).Client() // nothing may be sent
