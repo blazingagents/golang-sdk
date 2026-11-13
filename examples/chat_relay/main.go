@@ -1,12 +1,14 @@
-// Command chat_relay relays a browser's useChat requests to an agent: a demo sign-in check,
-// one POST /api/chat endpoint that accepts the default DefaultChatTransport body, and an SSE
-// response the AI SDK reads.
+// Command chat_relay is the backend of the TypeScript SDK's useBlazingAgentsChat hook: a demo
+// sign-in check and one POST /api/chat endpoint that follows the browser relay contract
+// (https://github.com/blazingagents/typescript-sdk/blob/main/docs/relay-contract.md).
 //
-// The browser needs nothing extra: wire useChat with
-// DefaultChatTransport({ api: "/api/chat", headers: { Authorization: "Bearer <token>" } })
-// and the relay maps its chat id to a session. The first response carries the new session's
-// URL in Location, which SetRelayHeaders copies for the browser. Tool approval rounds are not
-// handled here; use ChatService.Continue.
+// Every request is a JSON POST whose body op selects the operation: chat relays the UI message
+// stream (the first reply carries the new Session's URL in Location, which SetRelayHeaders
+// copies), history returns one page of a Session's messages, and steer submits a message to a
+// running Turn. The browser holds the Session ID, so the relay keeps no chat state.
+//
+// Wire the browser with
+// useBlazingAgentsChat({ api: "/api/chat", headers: { Authorization: "Bearer <token>" } }).
 //
 // Every call goes through a client scoped to the signed-in user. A scoped turn needs an Agent
 // and Workspace that user owns, so the relay finds the user's Agent, or creates one with the
@@ -29,15 +31,16 @@ import (
 	ba "github.com/blazingagents/golang-sdk"
 )
 
-// chatRequest is the body DefaultChatTransport POSTs: the chat id and the whole history.
-type chatRequest struct {
-	ID        string            `json:"id"`
-	Messages  []json.RawMessage `json:"messages"`
-	Trigger   string            `json:"trigger"`
-	MessageID *string           `json:"messageId"`
+// relayRequest holds the fields of every op; each op reads its own.
+type relayRequest struct {
+	Op        string          `json:"op"` // chat, history, or steer
+	SessionID ba.SessionID    `json:"sessionId"`
+	Message   json.RawMessage `json:"message"`
+	MessageID string          `json:"messageId"`
+	Trigger   string          `json:"trigger"` // submit-message or regenerate-message
+	Cursor    string          `json:"cursor"`
+	RequestID string          `json:"requestId"`
 }
-
-type sessionKey struct{ userID, chatID string }
 
 type app struct {
 	client     *ba.Client
@@ -48,15 +51,43 @@ type app struct {
 	mu sync.Mutex
 	// agents maps a user to their Agent. A real app persists this in its database.
 	agents map[string]ba.AgentID
-	// sessions maps useChat's chat id to the session it continues, per user. A real app
-	// persists this in its database.
-	sessions map[sessionKey]ba.SessionID
 }
 
-func writeError(w http.ResponseWriter, status int, message string) {
+func writeJSON(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]string{"error": message})
+	json.NewEncoder(w).Encode(body)
+}
+
+func writeError(w http.ResponseWriter, status int, code, message string) {
+	writeJSON(w, status, map[string]any{"error": map[string]string{"code": code, "message": message}})
+}
+
+// failure maps an SDK error to the contract's error body: the API's status and code when the
+// API refused the call, 499 for a browser abort, 502 for a failed API request, else 500.
+func failure(w http.ResponseWriter, r *http.Request, err error) {
+	var apiErr *ba.APIError
+	var argErr *ba.ArgumentError
+	var streamErr *ba.StreamError
+	var connErr *ba.ConnectionError
+	switch {
+	case r.Context().Err() != nil:
+		writeError(w, 499, "request_aborted", "The request was aborted.")
+	case errors.As(err, &argErr): // an invalid sessionId never reaches the URL
+		writeError(w, http.StatusBadRequest, "invalid_request", "Invalid request body.")
+	case errors.As(err, &apiErr):
+		if apiErr.Meta.RequestID != "" {
+			w.Header().Set("X-Request-Id", apiErr.Meta.RequestID)
+		}
+		writeError(w, apiErr.Status, string(apiErr.Code), apiErr.Message)
+	case errors.As(err, &streamErr):
+		writeError(w, http.StatusBadGateway, "stream_error", "The stream failed.")
+	case errors.As(err, &connErr):
+		writeError(w, http.StatusBadGateway, "network_error", "Unable to reach Blazing Agents.")
+	default:
+		log.Printf("relay failed: %v", err)
+		writeError(w, http.StatusInternalServerError, "internal_error", "Internal error.")
+	}
 }
 
 // userAgent returns the user's own Agent, creating it on the first call. It holds the lock so
@@ -86,89 +117,148 @@ func (a *app) userAgent(ctx context.Context, user *ba.UserClient, userID string)
 	return page.Data[0].ID, nil
 }
 
-// latestUserMessage is the last user message, which is the one useChat just submitted.
-func latestUserMessage(history []json.RawMessage) (ba.UserMessage, error) {
-	for i := len(history) - 1; i >= 0; i-- {
-		var probe struct {
-			Role string `json:"role"`
+// approvalDecisions reads the round's decisions: answered tool parts after the last step-start.
+func approvalDecisions(message json.RawMessage) []ba.ToolApprovalDecision {
+	var assistant struct {
+		Parts []struct {
+			Type     string `json:"type"`
+			State    string `json:"state"`
+			Approval *struct {
+				ID       ba.ApprovalID `json:"id"`
+				Approved bool          `json:"approved"`
+				Reason   string        `json:"reason"`
+			} `json:"approval"`
+		} `json:"parts"`
+	}
+	if json.Unmarshal(message, &assistant) != nil {
+		return nil
+	}
+	start := 0
+	for i, part := range assistant.Parts {
+		if part.Type == "step-start" {
+			start = i + 1
 		}
-		if json.Unmarshal(history[i], &probe) != nil || probe.Role != "user" {
+	}
+	var decisions []ba.ToolApprovalDecision
+	for _, part := range assistant.Parts[start:] {
+		if part.State != "approval-responded" || part.Approval == nil {
 			continue
 		}
-		var m ba.UserMessage
-		if err := json.Unmarshal(history[i], &m); err != nil {
-			return ba.UserMessage{}, errors.New("the last user message is invalid")
+		d := ba.Deny(part.Approval.ID, part.Approval.Reason) // "" sends no reason
+		if part.Approval.Approved {
+			d = ba.Approve(part.Approval.ID)
+			if part.Approval.Reason != "" {
+				d.Reason = new(part.Approval.Reason)
+			}
 		}
-		return m, nil
+		decisions = append(decisions, d)
 	}
-	return ba.UserMessage{}, errors.New("no user message in the history")
+	return decisions
 }
 
-func (a *app) chat(w http.ResponseWriter, r *http.Request) {
+func relayChat(w http.ResponseWriter, r *http.Request, user *ba.UserClient, agentID ba.AgentID, body relayRequest) error {
+	var role struct {
+		Role string `json:"role"`
+	}
+	json.Unmarshal(body.Message, &role)
+	var stream *ba.ChatStream
+	var err error
+	if role.Role == "assistant" {
+		decisions := approvalDecisions(body.Message)
+		if body.SessionID == "" || len(decisions) == 0 {
+			writeError(w, http.StatusBadRequest, "invalid_request", "Invalid approval.")
+			return nil
+		}
+		stream, err = user.Chat.Continue(r.Context(), agentID, body.SessionID, decisions, ba.ContinueParams{})
+	} else {
+		var message ba.UserMessage // UnmarshalJSON requires role user, an id and parts
+		if err := json.Unmarshal(body.Message, &message); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_request", "Invalid chat message.")
+			return nil
+		}
+		if body.SessionID != "" && body.Trigger == "regenerate-message" {
+			var regenerate ba.RegenerateParams
+			if body.MessageID != "" {
+				regenerate.MessageID = new(body.MessageID)
+			}
+			stream, err = user.Chat.Regenerate(r.Context(), agentID, body.SessionID, message, regenerate)
+		} else {
+			stream, err = user.Chat.Send(r.Context(), agentID, ba.Messages(message), ba.ChatParams{SessionID: body.SessionID})
+		}
+	}
+	if err != nil {
+		return err
+	}
+	defer stream.Close()
+	stream.SetRelayHeaders(w.Header()) // stream headers, Location and X-Request-Id
+	if _, err := stream.WriteTo(w); err != nil {
+		log.Printf("relay ended: %v", err)
+	}
+	return nil
+}
+
+// relayHistory forwards one page, newest first, and the browser follows nextCursor.
+func relayHistory(w http.ResponseWriter, r *http.Request, user *ba.UserClient, agentID ba.AgentID, body relayRequest) error {
+	params := ba.ListSessionMessagesParams{Limit: new(200)}
+	if body.Cursor != "" {
+		params.Cursor = &body.Cursor
+	}
+	page, err := user.Sessions.ListMessages(r.Context(), agentID, body.SessionID, params)
+	if err != nil {
+		return err
+	}
+	var next any // null on the oldest page
+	if page.NextCursor != "" {
+		next = page.NextCursor
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": page.Data, "nextCursor": next})
+	return nil
+}
+
+func relaySteer(w http.ResponseWriter, r *http.Request, user *ba.UserClient, agentID ba.AgentID, body relayRequest) error {
+	var message ba.UserMessage
+	if err := json.Unmarshal(body.Message, &message); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "Steering requires a user message.")
+		return nil
+	}
+	receipt, err := user.Sessions.SubmitInput(r.Context(), agentID, body.SessionID,
+		ba.SubmitSessionInputParams{RequestID: body.RequestID, Message: message})
+	if err != nil {
+		return err
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{"state": receipt.Input.State})
+	return nil
+}
+
+var ops = map[string]func(http.ResponseWriter, *http.Request, *ba.UserClient, ba.AgentID, relayRequest) error{
+	"chat":    relayChat,
+	"history": relayHistory,
+	"steer":   relaySteer,
+}
+
+func (a *app) relay(w http.ResponseWriter, r *http.Request) {
 	// Demo sign-in check: the bearer token maps to one user. Replace with your own sign-in check.
 	if r.Header.Get("Authorization") != "Bearer "+a.demoToken {
-		writeError(w, http.StatusUnauthorized, "unauthorized")
+		writeError(w, http.StatusUnauthorized, "unauthorized", "Authentication required.")
 		return
 	}
 	userID := "user-1"
-
-	var body chatRequest
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid body")
-		return
-	}
-	if body.Trigger == "" {
-		body.Trigger = "submit-message"
-	}
-	message, err := latestUserMessage(body.Messages)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
 	user, err := a.client.ForUser(userID)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid user ID")
+		writeError(w, http.StatusUnauthorized, "unauthorized", "Authentication required.")
+		return
+	}
+	var body relayRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || ops[body.Op] == nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "Invalid request body.")
 		return
 	}
 	agentID, err := a.userAgent(r.Context(), user, userID)
-	if err != nil {
-		log.Printf("preparing the user's agent failed: %v", err)
-		writeError(w, http.StatusBadGateway, "the agent call failed")
-		return
-	}
-	key := sessionKey{userID, body.ID}
-	a.mu.Lock()
-	sessionID := a.sessions[key]
-	a.mu.Unlock()
-
-	var stream *ba.ChatStream
-	switch {
-	case body.Trigger == "submit-message":
-		stream, err = user.Chat.Send(r.Context(), agentID, ba.Messages(message), ba.ChatParams{SessionID: sessionID})
-	case body.Trigger == "regenerate-message" && sessionID != "":
-		stream, err = user.Chat.Regenerate(r.Context(), agentID, sessionID, message, ba.RegenerateParams{MessageID: body.MessageID})
-	case body.Trigger == "regenerate-message":
-		writeError(w, http.StatusBadRequest, "unknown chat id")
-		return
-	default:
-		writeError(w, http.StatusBadRequest, "unknown trigger")
-		return
+	if err == nil {
+		err = ops[body.Op](w, r, user, agentID, body)
 	}
 	if err != nil {
-		log.Printf("agent call failed: %v", err)
-		writeError(w, http.StatusBadGateway, "the agent call failed")
-		return
-	}
-	defer stream.Close()
-
-	if body.Trigger == "submit-message" {
-		a.mu.Lock()
-		a.sessions[key] = stream.SessionID()
-		a.mu.Unlock()
-	}
-	stream.SetRelayHeaders(w.Header())
-	if _, err := stream.WriteTo(w); err != nil {
-		log.Printf("relay ended: %v", err)
+		failure(w, r, err)
 	}
 }
 
@@ -183,13 +273,12 @@ func main() {
 		model:      os.Getenv("BLAZING_AGENTS_MODEL"),
 		demoToken:  os.Getenv("DEMO_USER_TOKEN"),
 		agents:     map[string]ba.AgentID{},
-		sessions:   map[sessionKey]ba.SessionID{},
 	}
 	if a.providerID == "" || a.model == "" || a.demoToken == "" {
 		log.Fatal("set BLAZING_AGENTS_PROVIDER_ID, BLAZING_AGENTS_MODEL and DEMO_USER_TOKEN")
 	}
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /api/chat", a.chat)
+	mux.HandleFunc("POST /api/chat", a.relay)
 	log.Print("listening on http://127.0.0.1:8787")
 	log.Fatal(http.ListenAndServe("127.0.0.1:8787", mux))
 }

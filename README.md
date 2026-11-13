@@ -111,8 +111,9 @@ lists the environment variables it reads and the command that runs it.
 
 - `quickstart` saves a Prompt, runs it as a completion, and chats with an
   Agent.
-- `chat_relay` is a `net/http` server that relays `useChat` requests from a
-  signed-in user to that user's own Agent.
+- `chat_relay` is a `net/http` server that implements the browser relay
+  contract of `useBlazingAgentsChat`: chat, history and steer for a signed-in
+  user's own Agent.
 - `structured_output` generates an object whose JSON Schema is derived from
   a Go type.
 
