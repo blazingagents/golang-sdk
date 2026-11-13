@@ -223,7 +223,6 @@ func (c *relayCall) stream(stream *ChatStream, err error) error {
 	defer stream.Close()
 	h := c.w.Header()
 	stream.SetRelayHeaders(h)
-	h.Set("X-Accel-Buffering", "no")
 	c.w.WriteHeader(stream.Meta().Status)
 	if _, err := stream.WriteTo(c.w); err != nil {
 		c.user.t.logger.LogAttrs(c.r.Context(), slog.LevelDebug, "blazingagents chat relay stream ended", slog.Any("error", err))
