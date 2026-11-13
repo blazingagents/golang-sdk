@@ -20,6 +20,7 @@ type Agent struct {
 	Model                   *string           `json:"model"`
 	ThinkingLevel           *string           `json:"thinkingLevel"`
 	ProviderID              *ProviderID       `json:"providerId"`
+	AutoApprovalModel       *string           `json:"autoApprovalModel"` // reviews tool calls whose approval is auto; nil uses Model
 	WorkspaceID             WorkspaceID       `json:"workspaceId"`
 	AutoCompaction          bool              `json:"autoCompaction"`
 	CompactionReserveTokens int64             `json:"compactionReserveTokens"`
@@ -58,12 +59,13 @@ type CreateAgentParams struct {
 	ApprovalInChat  *ApprovalPolicy `json:"approvalInChat,omitzero"`
 	ApprovalInTasks *ApprovalPolicy `json:"approvalInTasks,omitzero"`
 	Name            string          `json:"name"`
-	// ProviderID and Model are both omitted, both set, or both Null. ThinkingLevel cannot be
-	// set while ProviderID is Null.
+	// ProviderID and Model are both omitted, both set, or both Null. ThinkingLevel and
+	// AutoApprovalModel cannot be set while ProviderID is Null.
 	Model                   Nullable[string]     `json:"model,omitzero"`
 	ThinkingLevel           Nullable[string]     `json:"thinkingLevel,omitzero"`
 	ProviderID              Nullable[ProviderID] `json:"providerId,omitzero"`
-	WorkspaceID             *WorkspaceID         `json:"workspaceId,omitzero"` // nil creates a workspace
+	AutoApprovalModel       Nullable[string]     `json:"autoApprovalModel,omitzero"` // reviews tool calls whose approval is auto; omitted or Null uses Model
+	WorkspaceID             *WorkspaceID         `json:"workspaceId,omitzero"`       // nil creates a workspace
 	AutoCompaction          *bool                `json:"autoCompaction,omitzero"`
 	CompactionReserveTokens *int                 `json:"compactionReserveTokens,omitzero"`
 	MemoryInjectionEnabled  *bool                `json:"memoryInjectionEnabled,omitzero"`
@@ -81,9 +83,11 @@ type UpdateAgentParams struct {
 	Name            *string         `json:"name,omitzero"`
 	// Model alone changes the model on the agent's current provider. ProviderID needs Model,
 	// and Null on both clears the model, which also clears ThinkingLevel when it is omitted.
+	// Changing ProviderID without AutoApprovalModel resets AutoApprovalModel to null.
 	Model                   Nullable[string]     `json:"model,omitzero"`
 	ThinkingLevel           Nullable[string]     `json:"thinkingLevel,omitzero"`
 	ProviderID              Nullable[ProviderID] `json:"providerId,omitzero"`
+	AutoApprovalModel       Nullable[string]     `json:"autoApprovalModel,omitzero"` // Null uses Model
 	WorkspaceID             *WorkspaceID         `json:"workspaceId,omitzero"`
 	AutoCompaction          *bool                `json:"autoCompaction,omitzero"`
 	CompactionReserveTokens *int                 `json:"compactionReserveTokens,omitzero"`
@@ -107,7 +111,7 @@ type UpdateMCPAttachmentParams struct {
 
 // agentsCheckModel applies the server's provider and model rules before anything is sent.
 // On update, Model alone is allowed: it changes the model on the current provider.
-func agentsCheckModel(provider Nullable[ProviderID], model, thinking Nullable[string], update bool) error {
+func agentsCheckModel(provider Nullable[ProviderID], model, thinking, autoApproval Nullable[string], update bool) error {
 	switch {
 	case provider.state == model.state:
 	case update && provider.state == omitted && model.state == isSet:
@@ -118,6 +122,9 @@ func agentsCheckModel(provider Nullable[ProviderID], model, thinking Nullable[st
 	}
 	if thinking.state == isSet && provider.state == isNull {
 		return &ArgumentError{Name: "params.ThinkingLevel", Reason: "a thinking level needs a provider, but ProviderID is Null"}
+	}
+	if autoApproval.state == isSet && provider.state == isNull {
+		return &ArgumentError{Name: "params.AutoApprovalModel", Reason: "an auto-approval model needs a provider, but ProviderID is Null"}
 	}
 	return nil
 }
@@ -141,10 +148,10 @@ func (s *AgentsService) All(ctx context.Context, params ListAgentsParams, opts .
 }
 
 // Create creates an agent (createAgent). It rejects an unpaired ProviderID and Model, a
-// ThinkingLevel with a Null provider, and WorkspaceID with WorkspaceTier.
+// ThinkingLevel or AutoApprovalModel with a Null provider, and WorkspaceID with WorkspaceTier.
 // See https://docs.blazingagents.com/api-reference/rest-api/agents#create-agent.
 func (s *AgentsService) Create(ctx context.Context, params CreateAgentParams, opts ...RequestOption) (*Agent, error) {
-	if err := agentsCheckModel(params.ProviderID, params.Model, params.ThinkingLevel, false); err != nil {
+	if err := agentsCheckModel(params.ProviderID, params.Model, params.ThinkingLevel, params.AutoApprovalModel, false); err != nil {
 		return nil, err
 	}
 	if params.WorkspaceID != nil && params.WorkspaceTier != nil {
@@ -161,11 +168,11 @@ func (s *AgentsService) Get(ctx context.Context, agentID AgentID, opts ...Reques
 
 // Update changes the fields params sets and leaves the others unchanged (updateAgent). It
 // rejects ProviderID without Model, Model Null without ProviderID, a Null paired with a
-// value, and a ThinkingLevel with a Null provider. When ProviderID and Model are both Null
+// value, and a ThinkingLevel or AutoApprovalModel with a Null provider. When ProviderID and Model are both Null
 // and ThinkingLevel is omitted, it also sends "thinkingLevel": null.
 // See https://docs.blazingagents.com/api-reference/rest-api/agents#update-agent.
 func (s *AgentsService) Update(ctx context.Context, agentID AgentID, params UpdateAgentParams, opts ...RequestOption) (*Agent, error) {
-	if err := agentsCheckModel(params.ProviderID, params.Model, params.ThinkingLevel, true); err != nil {
+	if err := agentsCheckModel(params.ProviderID, params.Model, params.ThinkingLevel, params.AutoApprovalModel, true); err != nil {
 		return nil, err
 	}
 	if params.ProviderID.IsNull() && params.ThinkingLevel.IsZero() {

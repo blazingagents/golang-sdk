@@ -22,6 +22,7 @@ type AgentConfig struct {
 	Model                   *string           `json:"model"`
 	ThinkingLevel           *string           `json:"thinkingLevel"`
 	ProviderID              *ProviderID       `json:"providerId"`
+	AutoApprovalModel       *string           `json:"autoApprovalModel"`
 	AutoCompaction          bool              `json:"autoCompaction"`
 	CompactionReserveTokens int64             `json:"compactionReserveTokens"`
 	MemoryInjectionEnabled  bool              `json:"memoryInjectionEnabled"`

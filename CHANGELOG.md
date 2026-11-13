@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `Agent.AutoApprovalModel` and `AgentConfig.AutoApprovalModel` return the model
+  that reviews the Agent's tool calls whose approval is `auto`; it is nil when
+  the Agent's own model reviews them. `CreateAgentParams.AutoApprovalModel` and
+  `UpdateAgentParams.AutoApprovalModel` set it as a `Nullable[string]`: `Value`
+  names a model on the Agent's provider and `Null` returns to the Agent's model.
+  `Create` and `Update` reject an `AutoApprovalModel` when `ProviderID` is
+  `Null`. Changing `ProviderID` on an update without sending `AutoApprovalModel`
+  resets it to nil.
+
+  ```go
+  agent, err := client.Agents.Update(ctx, agentID, ba.UpdateAgentParams{
+  	AutoApprovalModel: ba.Value("openai/gpt-6-luna-mini"),
+  })
+  ```
+
 ## 0.9.0 (2026-11-13)
 
 ### Added
