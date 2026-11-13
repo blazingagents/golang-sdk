@@ -12,7 +12,7 @@
   scopes every API request to `RelayContext.UserID` with `ForUser`, relays the
   Turn with its `Location`, `X-BA-Turn-Id` and `X-Request-Id` headers, cancels
   the Turn when the browser disconnects, and answers errors as the relay
-  contract says.
+  contract says. `examples/chat_relay` now uses it.
 
   ```go
   mux.Handle("POST /api/chat", ba.NewChatRelay(client, func(r *http.Request) (*ba.RelayContext, error) {
