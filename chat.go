@@ -206,8 +206,16 @@ func (s *ChatStream) Events() iter.Seq2[[]byte, error] {
 
 // WriteTo relays every remaining event and flushes after each: through
 // http.NewResponseController for an http.ResponseWriter, else through a Flush() error method.
+// For an http.ResponseWriter it first flushes the status and headers already set, so the
+// browser's fetch resolves and reads Location and X-BA-Turn-Id without waiting for the API's
+// first event.
 func (s *ChatStream) WriteTo(w io.Writer) (int64, error) {
 	flush := flusher(w)
+	if _, ok := w.(http.ResponseWriter); ok {
+		if err := flush(); err != nil {
+			return 0, err
+		}
+	}
 	var n int64
 	for ev, err := range s.Events() {
 		if err != nil {
@@ -244,7 +252,7 @@ func flusher(w io.Writer) func() error {
 // SetRelayHeaders sets the headers a browser useChat transport expects (including
 // X-Accel-Buffering: no, so proxies such as nginx do not buffer the stream), and copies the API
 // response's Location (present when the turn created the Session, so a browser learns its ID)
-// and X-Request-Id. Call it before WriteTo.
+// and X-Request-Id. Call it before WriteHeader and WriteTo.
 func (s *ChatStream) SetRelayHeaders(h http.Header) {
 	h.Set("Content-Type", "text/event-stream")
 	h.Set("Cache-Control", "no-cache")

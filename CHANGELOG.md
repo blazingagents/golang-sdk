@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- `ChatStream.WriteTo` now flushes the status and headers to an
+  `http.ResponseWriter` before it waits for the first event. A browser's
+  `fetch` used to stay pending until the API sent its first frame, so
+  `Location` (the new Session ID), `X-BA-Turn-Id` and the stream start reached
+  it late and it could not steer or Stop in the meantime. `NewChatRelay` and
+  hand-written relays that call `SetRelayHeaders`, `WriteHeader` and `WriteTo`
+  both get the fix.
+
 ## 0.10.0 (2026-11-13)
 
 ### Added
