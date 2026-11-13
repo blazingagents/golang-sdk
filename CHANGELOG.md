@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `NewChatRelay` returns an `http.Handler` that serves the browser chat relay,
+  the one endpoint that `useBlazingAgentsChat` and `BlazingAgentsChatTransport`
+  post to. Its `chat`, `history` and `steer` operations replace the handler
+  that a Go backend had to write by hand. You supply the client and a function
+  that signs the request in and picks the Agent as a `RelayContext`; the relay
+  scopes every API request to `RelayContext.UserID` with `ForUser`, relays the
+  Turn with its `Location`, `X-BA-Turn-Id` and `X-Request-Id` headers, cancels
+  the Turn when the browser disconnects, and answers errors as the relay
+  contract says. `examples/chat_relay` now uses it.
+
+  ```go
+  mux.Handle("POST /api/chat", ba.NewChatRelay(client, func(r *http.Request) (*ba.RelayContext, error) {
+  	userID, ok := signedInUser(r) // your own sign-in
+  	if !ok {
+  		return nil, nil // the relay answers 401
+  	}
+  	return &ba.RelayContext{AgentID: agentOf(userID), UserID: userID}, nil
+  }))
+  ```
+
 ## 0.8.0 (2026-11-09)
 
 ### Added

@@ -241,13 +241,15 @@ func flusher(w io.Writer) func() error {
 	return func() error { return nil }
 }
 
-// SetRelayHeaders sets the headers a browser useChat transport expects, and copies the API
+// SetRelayHeaders sets the headers a browser useChat transport expects (including
+// X-Accel-Buffering: no, so proxies such as nginx do not buffer the stream), and copies the API
 // response's Location (present when the turn created the Session, so a browser learns its ID)
 // and X-Request-Id. Call it before WriteTo.
 func (s *ChatStream) SetRelayHeaders(h http.Header) {
 	h.Set("Content-Type", "text/event-stream")
 	h.Set("Cache-Control", "no-cache")
 	h.Set("X-Vercel-AI-UI-Message-Stream", "v1")
+	h.Set("X-Accel-Buffering", "no")
 	h.Set("X-BA-Turn-Id", string(s.turnID))
 	if loc := s.resp.Header.Get("Location"); loc != "" {
 		h.Set("Location", loc)

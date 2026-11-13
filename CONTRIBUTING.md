@@ -32,7 +32,7 @@ CI runs the gate on Go 1.27, and `go vet ./...` and `go test -race ./...` on Go 
 
 There is one package at the module root, `blazingagents`, imported as `ba`. The service structs are declared in `client.go`, and each resource file adds the methods of its service: `agents.go`, `sessions.go`, `merchant.go` and so on.
 
-- The core is `client.go`, `options.go`, `transport.go`, `query.go`, `errors.go`, `ids.go`, `nullable.go`, `secret.go`, `date.go`, `page.go`, `union.go`, `unions.go`, `sse.go`, `upload.go`, `download.go`, `messages.go`, `shared.go`, `chat.go`, `generation.go`, `schema.go`, `functions.go` and `runner.go`.
+- The core is `client.go`, `options.go`, `transport.go`, `query.go`, `errors.go`, `ids.go`, `nullable.go`, `secret.go`, `date.go`, `page.go`, `union.go`, `unions.go`, `sse.go`, `upload.go`, `download.go`, `messages.go`, `shared.go`, `chat.go`, `relay.go`, `generation.go`, `schema.go`, `functions.go` and `runner.go`.
 - `internal/op/op.go`, `errorcode.go`, `enums.go` and `agenttools.go` are generated. Never edit them by hand.
 - `spec/openapi.json` is the vendored platform spec. Each operation's `x-scope` says whether an end user may call it (`end-user`) or it needs Tenant authority (`tenant`), which decides whether a service is on `UserClient`. The server enforces the same field. `x-credential-bearing: true` marks an operation whose responses the SDK refuses when they echo a credential.
 - `internal/cmd/specgen` is the generator, `internal/cmd/gate` is the gate, and `internal/testkit` is the test support: the mock server, spec examples and the shared checks.

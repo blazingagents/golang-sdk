@@ -269,7 +269,7 @@ func TestChatWriteTo(t *testing.T) {
 		if err != nil || n != 18 || rec.Body.String() != "data: a\n\ndata: b\n\n" || !rec.Flushed {
 			t.Fatalf("n %d err %v body %q flushed %v", n, err, rec.Body, rec.Flushed)
 		}
-		want := http.Header{"Content-Type": {"text/event-stream"}, "Cache-Control": {"no-cache"}, "X-Vercel-Ai-Ui-Message-Stream": {"v1"}, "X-Ba-Turn-Id": {ids.turn}, "Location": {"/v1/agents/" + string(ids.agent) + "/sessions/" + string(ids.session)}, "X-Request-Id": {"req_relay"}}
+		want := http.Header{"Content-Type": {"text/event-stream"}, "Cache-Control": {"no-cache"}, "X-Vercel-Ai-Ui-Message-Stream": {"v1"}, "X-Accel-Buffering": {"no"}, "X-Ba-Turn-Id": {ids.turn}, "Location": {"/v1/agents/" + string(ids.agent) + "/sessions/" + string(ids.session)}, "X-Request-Id": {"req_relay"}}
 		if jsonString(rec.Header()) != jsonString(want) {
 			t.Fatalf("relay headers %v", rec.Header())
 		}
