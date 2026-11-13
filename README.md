@@ -23,6 +23,8 @@ and newer.
   approvals, and backend functions that run in your process.
 - Text and structured-object generation.
 - End-user scoped clients through `ForUser`.
+- `NewChatRelay`, an `http.Handler` for the browser chat of
+  `useBlazingAgentsChat`.
 - Iterators over paginated lists, uploads, and streamed downloads.
 - Request IDs and typed errors.
 - No dependencies outside the standard library.
@@ -103,6 +105,21 @@ A scoped chat with an Agent created without the scope fails with `404`.
 `chatAsUser` returns a `ChatStream` of server-sent event bytes. Relay it to
 the browser with `stream.SetRelayHeaders(w.Header())` and `stream.WriteTo(w)`,
 and AI SDK `useChat` reads it.
+
+A browser chat built with `useBlazingAgentsChat` posts to one endpoint of your
+backend, because the browser holds no API key. `NewChatRelay` serves that
+endpoint as an `http.Handler`. You supply the sign-in and the user's Agent, and
+the relay scopes every call to that user:
+
+```go
+mux.Handle("POST /api/chat", ba.NewChatRelay(client, func(r *http.Request) (*ba.RelayContext, error) {
+	userID, ok := signedInUser(r) // your own sign-in check
+	if !ok {
+		return nil, nil // the relay answers 401
+	}
+	return &ba.RelayContext{AgentID: agentOf(userID), UserID: userID}, nil
+}))
+```
 
 ## Examples
 
