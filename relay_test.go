@@ -521,3 +521,64 @@ func TestRelayBodyLimit(t *testing.T) {
 	body := `{"op":"chat","note":"` + strings.Repeat("a", 15<<20) + `","message":` + chatMessage + `}`
 	relayExpectJSON(t, relayPost(h, body), 400, relayError("invalid_request", "Invalid request body."))
 }
+
+// relayHeadBeforeFirstFrame serves handler and reports what a browser's fetch resolves with
+// while the API holds back its first SSE frame.
+func relayHeadBeforeFirstFrame(t *testing.T, handler http.Handler) *http.Response {
+	t.Helper()
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, srv.URL, strings.NewReader(`{"op":"chat","message":`+chatMessage+`}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("no response head while the API held back its first frame: %v", err)
+	}
+	t.Cleanup(func() { resp.Body.Close() })
+	return resp
+}
+
+func relayExpectHeldBackTurn(m *testkit.Mock, ids chatIDs) {
+	m.Expect(testkit.Exchange{Op: "createSessionTurn", BodyFunc: relayAnyBody, Status: 201, RespHeader: ids.created(),
+		Interval: time.Minute, SSE: []string{"data: a\n\n"}})
+}
+
+func TestRelayChatSendsTheHeadBeforeTheFirstFrame(t *testing.T) {
+	ids := newChatIDs()
+	m := testkit.New(t)
+	h := ba.NewChatRelay(m.Client(), func(*http.Request) (*ba.RelayContext, error) {
+		return &ba.RelayContext{AgentID: ids.agent, UserID: "user-1"}, nil
+	})
+	relayExpectHeldBackTurn(m, ids)
+	resp := relayHeadBeforeFirstFrame(t, h)
+	if resp.StatusCode != 201 || resp.Header.Get("X-Ba-Turn-Id") != ids.turn ||
+		resp.Header.Get("Location") != "/v1/agents/"+string(ids.agent)+"/sessions/"+string(ids.session) {
+		t.Fatalf("head %d %v", resp.StatusCode, resp.Header)
+	}
+}
+
+func TestChatWriteToSendsTheHeadBeforeTheFirstFrame(t *testing.T) {
+	ids := newChatIDs()
+	m := testkit.New(t)
+	client := m.Client()
+	relayExpectHeldBackTurn(m, ids)
+	handwritten := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		stream, err := client.Chat.Send(r.Context(), ids.agent, chatInput(), ba.ChatParams{})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		defer stream.Close()
+		stream.SetRelayHeaders(w.Header())
+		w.WriteHeader(stream.Meta().Status)
+		stream.WriteTo(w)
+	})
+	resp := relayHeadBeforeFirstFrame(t, handwritten)
+	if resp.StatusCode != 201 || resp.Header.Get("X-Ba-Turn-Id") != ids.turn {
+		t.Fatalf("head %d %v", resp.StatusCode, resp.Header)
+	}
+}
