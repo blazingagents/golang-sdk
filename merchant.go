@@ -285,8 +285,11 @@ func (s *MerchantUsageEventsService) Get(ctx context.Context, eventID MerchantUs
 	return unwrap[MerchantUsageEvent]("event")(s.s.send(ctx, op.GetMerchantUsageEvent(string(eventID)), nil, opts))
 }
 
-// Retry sends a failed event, or a pending one automatic delivery gave up on, to
-// the provider again (retryMerchantUsageEvent). The provider drops duplicates by event ID.
+// Retry sends a failed event, or a pending one whose delivery stopped, to the
+// provider again (retryMerchantUsageEvent). Blazing Agents retries a stopped
+// delivery on its own after 5, 10, 20 and 40 minutes; after the fourth automatic
+// retry the event stays pending until you retry it. The provider drops duplicates
+// by event ID.
 // See https://docs.blazingagents.com/api-reference/rest-api/merchant#retry-merchant-usage-event.
 func (s *MerchantUsageEventsService) Retry(ctx context.Context, eventID MerchantUsageEventID, opts ...RequestOption) (*MerchantUsageEvent, error) {
 	return unwrap[MerchantUsageEvent]("event")(s.s.send(ctx, op.RetryMerchantUsageEvent(string(eventID)), nil, opts))
