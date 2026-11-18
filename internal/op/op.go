@@ -998,6 +998,7 @@ var Fields = map[string][]Field{
 		{Name: "functions", In: "body", Type: "map"},
 	},
 	"copySkill": {
+		{Name: "idempotency-key", In: "header", Type: "string"},
 		{Name: "agentIds", In: "body", Required: true, Type: "array"},
 	},
 	"createAgent": {
@@ -1110,6 +1111,7 @@ var Fields = map[string][]Field{
 		{Name: "variables", In: "body", Type: "map"},
 	},
 	"createSkill": {
+		{Name: "idempotency-key", In: "header", Type: "string"},
 		{Name: "content", In: "body", Required: true, Type: "string"},
 		{Name: "path", In: "body", Required: true, Type: "string"},
 	},
@@ -1458,6 +1460,7 @@ var Fields = map[string][]Field{
 		{Name: "file", In: "body", Required: true, Type: "string"},
 	},
 	"uploadSkill": {
+		{Name: "idempotency-key", In: "header", Type: "string"},
 		{Name: "file", In: "body", Required: true, Type: "string"},
 		{Name: "type", In: "body", Required: true, Type: "string", Enum: "ArchiveType"},
 	},
