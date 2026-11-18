@@ -63,6 +63,7 @@ const (
 	ErrorCodeSessionVersionMismatch              ErrorCode = "session_version_mismatch"
 	ErrorCodeToolApprovalContinuationSettled     ErrorCode = "tool_approval_continuation_settled"
 	ErrorCodeToolApprovalDecisionConflict        ErrorCode = "tool_approval_decision_conflict"
+	ErrorCodeToolApprovalOutdated                ErrorCode = "tool_approval_outdated"
 	ErrorCodeFunctionCallConflict                ErrorCode = "function_call_conflict"
 	ErrorCodeSkillInvalidArchive                 ErrorCode = "skill_invalid_archive"
 	ErrorCodeSkillInvalidMarkdown                ErrorCode = "skill_invalid_markdown"
