@@ -70,6 +70,8 @@ type multipartParams struct {
 	fields      [][2]string
 	file        Upload
 	defaultName string // used when the Upload has no name
+	// IdempotencyKey is sent as a header, not as a part.
+	IdempotencyKey string `header:"Idempotency-Key,omitzero"`
 }
 
 // binaryParams is the body of putSkillFile.

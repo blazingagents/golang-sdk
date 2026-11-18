@@ -73,6 +73,12 @@ var paramsBuiltBySDK = []string{
 	"createMcpConnection", "reconnectMcpConnection", "createChatConnection", "rotateChatCredentials",
 }
 
+// paramsBuiltBySDKTypes maps an operation of paramsBuiltBySDK that has header fields to the params
+// type that carries them; its body fields are not checked.
+var paramsBuiltBySDKTypes = map[string]reflect.Type{
+	"uploadSkill": reflect.TypeFor[ba.UploadSkillParams](),
+}
+
 // paramsExceptions are spec fields that are positional or filled by the SDK.
 var paramsExceptions = map[string]bool{
 	"getSkillFile.path": true, "deleteSkillFile.path": true, "listThinkingLevels.model": true,
@@ -90,6 +96,7 @@ func TestParamsMatchTheSpec(t *testing.T) {
 	for key, fields := range op.Fields {
 		id, _, _ := strings.Cut(key, "#")
 		if slices.Contains(paramsBuiltBySDK, id) {
+			paramsCheckHeaders(t, id, fields)
 			continue
 		}
 		typ, ok := paramsTypes[id]
@@ -129,6 +136,45 @@ type paramsGoField struct {
 	fromTag  string // the json tag options
 }
 
+// paramsHeaderTag splits a header tag into the name as the spec spells it and the tag's options.
+func paramsHeaderTag(spec []op.Field, tag string) (name, opts string) {
+	name, opts, _ = strings.Cut(tag, ",")
+	for _, s := range spec {
+		if s.In == "header" && http.CanonicalHeaderKey(s.Name) == http.CanonicalHeaderKey(name) {
+			name = s.Name
+		}
+	}
+	return name, opts
+}
+
+// paramsCheckHeaders checks the header fields of an operation whose body the SDK writes.
+func paramsCheckHeaders(t *testing.T, id string, spec []op.Field) {
+	typ, mapped := paramsBuiltBySDKTypes[id]
+	for _, s := range spec {
+		if s.In != "header" {
+			continue
+		}
+		if !mapped {
+			t.Errorf("%s: header %s has no params type in paramsBuiltBySDKTypes", id, s.Name)
+			continue
+		}
+		var match []paramsGoField
+		for i := range typ.NumField() {
+			f := typ.Field(i)
+			if tag, ok := f.Tag.Lookup("header"); ok {
+				if name, opts := paramsHeaderTag(spec, tag); name == s.Name {
+					match = append(match, paramsGoField{f, name, "header", opts})
+				}
+			}
+		}
+		if len(match) != 1 {
+			t.Errorf("%s: spec field %s (header) has %d Go fields", id, s.Name, len(match))
+			continue
+		}
+		paramsCheckField(t, id+"."+match[0].f.Name, match[0], s)
+	}
+}
+
 func paramsGoFields(t *testing.T, where string, typ reflect.Type, query []string, spec []op.Field) []paramsGoField {
 	var out []paramsGoField
 	for i := range typ.NumField() {
@@ -154,13 +200,9 @@ func paramsGoFields(t *testing.T, where string, typ reflect.Type, query []string
 			out = append(out, paramsGoField{f, q, "query", opts})
 			continue
 		}
-		if h, ok := f.Tag.Lookup("header"); ok {
-			for _, s := range spec {
-				if s.In == "header" && http.CanonicalHeaderKey(s.Name) == http.CanonicalHeaderKey(h) {
-					h = s.Name
-				}
-			}
-			out = append(out, paramsGoField{f, h, "header", opts})
+		if tag, ok := f.Tag.Lookup("header"); ok {
+			h, hopts := paramsHeaderTag(spec, tag)
+			out = append(out, paramsGoField{f, h, "header", hopts})
 			continue
 		}
 		if name == "" || name == "-" {
@@ -231,6 +273,9 @@ func paramsCheckField(t *testing.T, where string, g paramsGoField, s op.Field) {
 	case g.in == "header":
 		if typ.Kind() != reflect.String {
 			t.Errorf("%s: a header is a string", where)
+		}
+		if omitzero == s.Required {
+			t.Errorf("%s: an optional header is tagged omitzero and a required one is not", where)
 		}
 	case s.Required && !s.Nullable:
 		if isPtr || nullable || omitzero {

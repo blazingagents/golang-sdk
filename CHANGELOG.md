@@ -4,6 +4,24 @@
 
 ### Added
 
+- `CreateSkillParams.IdempotencyKey`, `UploadSkillParams.IdempotencyKey` and
+  `CopySkillParams.IdempotencyKey` set the optional `Idempotency-Key` header of
+  `Skills.Create`, `Skills.Upload` and `Skills.Copy`: 1 to 200 characters, sent
+  only when not empty. Retrying with the same key and the same request returns
+  the Skill the first request created, and for a copy each destination reports
+  the copy it already has as created. The same key with a different request
+  answers `idempotency_conflict`, and for a copy that destination is `failed`
+  with that code. A key belongs to one Agent and lasts as long as its Skill.
+  Before, a retry of a create whose answer was lost could answer
+  `skill_name_conflict` for the Skill the first request had made.
+
+  ```go
+  skill, err := client.Skills.Create(ctx, agentID, ba.CreateSkillParams{
+  	Content:        content,
+  	IdempotencyKey: "refunds-skill-v1",
+  })
+  ```
+
 - `ErrorCodeToolApprovalOutdated` (`tool_approval_outdated`). When an agent's
   connections, skills or workspace change while a tool approval waits,
   `Chat.Continue` still answers with a `200` stream, and the approved tool does

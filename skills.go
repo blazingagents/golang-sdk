@@ -51,12 +51,20 @@ type SkillCopyError struct {
 // CreateSkillParams is the body of createSkill. The SDK sends path "SKILL.md".
 type CreateSkillParams struct {
 	Content string `json:"content"` // the SKILL.md document; its YAML frontmatter sets name and description
+	// IdempotencyKey is sent as Idempotency-Key when it is not empty. Retry with the same key and
+	// the same Content to get the skill the first request created; the same key with a different
+	// Content answers idempotency_conflict.
+	IdempotencyKey string `json:"-" header:"Idempotency-Key,omitzero"`
 }
 
 // UploadSkillParams is the multipart body of uploadSkill.
 type UploadSkillParams struct {
 	Type ArchiveType // the archive's format
 	File Upload      // the archive, with SKILL.md at its root; named skill.<Type> when it has no name
+	// IdempotencyKey is sent as Idempotency-Key when it is not empty. Retry with the same key and
+	// the same archive to get the skill the first request created; the same key with a different
+	// archive answers idempotency_conflict.
+	IdempotencyKey string `json:"-" header:"Idempotency-Key,omitzero"`
 }
 
 // ListSkillsParams pages listSkills.
@@ -68,27 +76,34 @@ type ListSkillsParams struct {
 // CopySkillParams is the body of copySkill.
 type CopySkillParams struct {
 	AgentIDs []AgentID `json:"agentIds"` // 1 to 30 agents, each listed once
+	// IdempotencyKey is sent as Idempotency-Key when it is not empty. Retry with the same key and
+	// the same source skill: each agent that already has the copy reports it as created, and an
+	// agent where the key made a different skill reports idempotency_conflict.
+	IdempotencyKey string `json:"-" header:"Idempotency-Key,omitzero"`
 }
 
 type createSkillBody struct {
-	Path    string `json:"path"`
-	Content string `json:"content"`
+	Path           string `json:"path"`
+	Content        string `json:"content"`
+	IdempotencyKey string `json:"-" header:"Idempotency-Key,omitzero"`
 }
 
 type skillFilePath struct {
 	Path string `query:"path"`
 }
 
-// Create creates a skill from its SKILL.md document (createSkill).
+// Create creates a skill from its SKILL.md document (createSkill). Retry with the same
+// params.IdempotencyKey to get the skill the first request created.
 // See https://docs.blazingagents.com/api-reference/rest-api/skills#create-skill.
 func (s *SkillsService) Create(ctx context.Context, agentID AgentID, params CreateSkillParams, opts ...RequestOption) (*Skill, error) {
-	return decode[Skill](s.s.send(ctx, op.CreateSkill(string(agentID)), createSkillBody{"SKILL.md", params.Content}, opts))
+	return decode[Skill](s.s.send(ctx, op.CreateSkill(string(agentID)), createSkillBody{Path: "SKILL.md", Content: params.Content, IdempotencyKey: params.IdempotencyKey}, opts))
 }
 
-// Upload creates a skill from a zip, tar or tar.gz archive (uploadSkill).
+// Upload creates a skill from a zip, tar or tar.gz archive (uploadSkill). Retry with the same
+// params.IdempotencyKey to get the skill the first request created.
 // See https://docs.blazingagents.com/api-reference/rest-api/skills#upload-skill.
 func (s *SkillsService) Upload(ctx context.Context, agentID AgentID, params UploadSkillParams, opts ...RequestOption) (*Skill, error) {
-	body := multipartParams{fields: [][2]string{{"type", string(params.Type)}}, file: params.File, defaultName: "skill." + string(params.Type)}
+	body := multipartParams{fields: [][2]string{{"type", string(params.Type)}}, file: params.File, defaultName: "skill." + string(params.Type), IdempotencyKey: params.IdempotencyKey}
 	return decode[Skill](s.s.send(ctx, op.UploadSkill(string(agentID)), body, opts))
 }
 
@@ -149,7 +164,8 @@ func (s *SkillsService) DeleteFile(ctx context.Context, agentID AgentID, skillID
 }
 
 // Copy copies a skill to other agents and reports each copy's outcome in order
-// (copySkill). An empty params.AgentIDs is rejected before sending.
+// (copySkill). An empty params.AgentIDs is rejected before sending. Retry with the same
+// params.IdempotencyKey to get the copies the first request made.
 // See https://docs.blazingagents.com/api-reference/rest-api/skills#copy-skill.
 func (s *SkillsService) Copy(ctx context.Context, agentID AgentID, skillID SkillID, params CopySkillParams, opts ...RequestOption) ([]SkillCopyResult, error) {
 	if len(params.AgentIDs) == 0 {
