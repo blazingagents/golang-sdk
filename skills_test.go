@@ -199,6 +199,75 @@ func TestSkillsRequests(t *testing.T) {
 	})
 }
 
+// skillsKeyCall is one of the three methods that create a skill, with the request it sends.
+type skillsKeyCall struct {
+	op, path, body string // body is the exact JSON body; a multipart call has parts instead
+	parts          []testkit.Part
+	status         int
+	call           func(ctx context.Context, c *ba.Client, key string) (any, error)
+}
+
+func skillsKeyCalls() []skillsKeyCall {
+	agent, skill := skillsIDs()
+	base := "/v1/agents/" + string(agent) + "/skills"
+	return []skillsKeyCall{
+		{op: "createSkill", path: base, body: `{"path":"SKILL.md","content":"x"}`, status: 201,
+			call: func(ctx context.Context, c *ba.Client, key string) (any, error) {
+				return c.Skills.Create(ctx, agent, ba.CreateSkillParams{Content: "x", IdempotencyKey: key})
+			}},
+		{op: "uploadSkill", path: base + "/upload", status: 201,
+			parts: []testkit.Part{{Name: "type", Data: []byte("zip")}, {Name: "file", Filename: "s.zip", ContentType: "application/zip", Data: []byte("PK")}},
+			call: func(ctx context.Context, c *ba.Client, key string) (any, error) {
+				return c.Skills.Upload(ctx, agent, ba.UploadSkillParams{Type: ba.ArchiveTypeZip, File: ba.UploadBytes("s.zip", []byte("PK")), IdempotencyKey: key})
+			}},
+		{op: "copySkill", path: base + "/" + string(skill) + "/copies", body: `{"agentIds":["` + string(agent) + `"]}`, status: 200,
+			call: func(ctx context.Context, c *ba.Client, key string) (any, error) {
+				return c.Skills.Copy(ctx, agent, skill, ba.CopySkillParams{AgentIDs: []ba.AgentID{agent}, IdempotencyKey: key})
+			}},
+	}
+}
+
+// TestSkillsIdempotencyKey: IdempotencyKey travels as the Idempotency-Key header when it is set,
+// is absent from the request when it is empty, and is never part of the body.
+func TestSkillsIdempotencyKey(t *testing.T) {
+	var cases []testkit.Case
+	for _, tc := range skillsKeyCalls() {
+		for _, key := range []string{"skill-1", ""} {
+			e := testkit.Exchange{Op: tc.op, Path: tc.path, Body: tc.body, Multipart: tc.parts, Status: tc.status, RespBody: testkit.Example(tc.op, tc.status)}
+			name := tc.op + " without a key sends no Idempotency-Key"
+			if key != "" {
+				e.Header = http.Header{"Idempotency-Key": {key}}
+				name = tc.op + " sends the key as Idempotency-Key and not in the body"
+			} else {
+				e.NoHeader = []string{"Idempotency-Key"}
+			}
+			cases = append(cases, testkit.Case{
+				Name:      name,
+				Exchanges: []testkit.Exchange{e},
+				Call:      func(ctx context.Context, c *ba.Client) (any, error) { return tc.call(ctx, c, key) },
+			})
+		}
+	}
+	testkit.Run(t, cases)
+}
+
+// TestSkillsIdempotencyKeyInvalid: a key that is not a valid header value is rejected before
+// anything is sent, and an empty one is not an error.
+func TestSkillsIdempotencyKeyInvalid(t *testing.T) {
+	c := testkit.New(t).Client() // nothing may be sent
+	for _, tc := range skillsKeyCalls() {
+		for _, key := range []string{"k\n1", "k\x7f"} {
+			t.Run(fmt.Sprintf("%s %q", tc.op, key), func(t *testing.T) {
+				_, err := tc.call(context.Background(), c, key)
+				var ae *ba.ArgumentError
+				if !errors.As(err, &ae) || err.Error() != "blazingagents: invalid argument params.IdempotencyKey: must be a valid header value" {
+					t.Fatalf("error %v, want *ArgumentError", err)
+				}
+			})
+		}
+	}
+}
+
 func TestSkillsDecode(t *testing.T) {
 	agent, skill := skillsIDs()
 	ten := ba.TenantID(testkit.ID(op.IDPatterns["TenantID"]))

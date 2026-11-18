@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"reflect"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/blazingagents/golang-sdk/internal/op"
@@ -17,9 +18,11 @@ var (
 )
 
 // encodeQueryAndHeaders reads the query:"name" and header:"Name" fields of params, including
-// those of an embedded *DateRange. A query field is sent only when the operation lists it, so
-// a name the operation takes in its body is left to the body. It is the first to read params,
-// so it also rejects a typed nil behind a params interface ((*SlackConnection)(nil)).
+// those of an embedded *DateRange. A header field is required unless its tag ends in ",omitzero",
+// which leaves an empty value out of the request. A query field is sent only when the operation
+// lists it, so a name the operation takes in its body is left to the body. It is the first to
+// read params, so it also rejects a typed nil behind a params interface
+// ((*SlackConnection)(nil)).
 func encodeQueryAndHeaders(o *op.Operation, params any) (url.Values, http.Header, error) {
 	q, h := url.Values{}, http.Header{}
 	v := reflect.ValueOf(params)
@@ -36,12 +39,20 @@ func encodeQueryAndHeaders(o *op.Operation, params any) (url.Values, http.Header
 				q.Set(name, s)
 			}
 		}
-		if name, ok := f.Tag.Lookup("header"); ok {
+		if tag, ok := f.Tag.Lookup("header"); ok {
+			name, opts, _ := strings.Cut(tag, ",")
 			s := fv.String()
-			if s == "" || !validHeaderValue(s) {
-				return nil, nil, &ArgumentError{Name: "params." + f.Name, Reason: "must be a non-empty valid header value"}
+			switch {
+			case s == "" && opts == "omitzero":
+			case s == "" || !validHeaderValue(s):
+				reason := "must be a non-empty valid header value"
+				if opts == "omitzero" {
+					reason = "must be a valid header value"
+				}
+				return nil, nil, &ArgumentError{Name: "params." + f.Name, Reason: reason}
+			default:
+				h.Set(name, s)
 			}
-			h.Set(name, s)
 		}
 	}
 	return q, h, nil
