@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.13.0 (2026-11-21)
 
 The API's shapes now follow one rule per subject, so a list, a record, a retry and a missing record read the same on every resource. Every list returns its records under `data`, and a single record comes back bare. The SDK's methods decode those envelopes into the values they returned before, so only the changes below touch your code.
 
