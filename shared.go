@@ -28,6 +28,5 @@ type AgentConfig struct {
 	MemoryInjectionEnabled  bool              `json:"memoryInjectionEnabled"`
 	Tools                   []AgentTool       `json:"tools"`
 	Instructions            string            `json:"instructions"`
-	Metadata                Metadata          `json:"metadata"`
 	MCPConnectionIDs        []MCPConnectionID `json:"mcpConnectionIds"`
 }
