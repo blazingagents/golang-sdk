@@ -160,6 +160,11 @@ type fieldsEntry struct {
 func (g *gen) operation(o *operation) error {
 	var top []field
 	for _, p := range arr(o.o["parameters"]) {
+		// A parameter every operation shares, such as X-Client-Request-Id, is a
+		// components.parameters reference that the transport sends, not a params field.
+		if ref, _ := obj(p)["$ref"].(string); strings.HasPrefix(ref, "#/components/parameters/") {
+			continue
+		}
 		p := g.s.resolve(obj(p))
 		in := p["in"].(string)
 		name := p["name"].(string)
@@ -336,10 +341,10 @@ func (g *gen) render(ops []*operation) ([]byte, error) {
 		slices.Sort(g.unknownFP)
 		return nil, errors.New(strings.Join(slices.Compact(g.unknownFP), "; "))
 	}
-	apiKey, _ := obj(obj(g.s.comps["CreatedApiKey"])["properties"])["token"].(schema)
-	apiKeyPattern, _ := apiKey["pattern"].(string)
+	apiKey := obj(obj(obj(g.s.doc["components"])["securitySchemes"])["ApiKey"])
+	apiKeyPattern, _ := apiKey["x-token-pattern"].(string)
 	if apiKeyPattern == "" {
-		return nil, errors.New("CreatedApiKey.token has no pattern")
+		return nil, errors.New("securitySchemes.ApiKey has no x-token-pattern")
 	}
 	for _, t := range []string{"SessionID", "TurnID", "FunctionCallID"} {
 		if g.patterns[t] == "" {
