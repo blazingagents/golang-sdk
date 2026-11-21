@@ -166,17 +166,17 @@ func TestAgentsRequests(t *testing.T) {
 			},
 		},
 		{
-			Name:      "deleteAgent includeArtifacts false",
-			Exchanges: []testkit.Exchange{{Op: "deleteAgent", Path: path, NoHeader: agentsNoUser, Query: url.Values{"includeArtifacts": {"false"}}, Status: 204}},
+			Name:      "deleteAgent deleteArtifacts false",
+			Exchanges: []testkit.Exchange{{Op: "deleteAgent", Path: path, NoHeader: agentsNoUser, Query: url.Values{"deleteArtifacts": {"false"}}, Status: 204}},
 			Call: func(ctx context.Context, c *ba.Client) (any, error) {
 				return nil, c.Agents.Delete(ctx, id, ba.DeleteAgentParams{})
 			},
 		},
 		{
-			Name:      "deleteAgent includeArtifacts true",
-			Exchanges: []testkit.Exchange{{Op: "deleteAgent", Path: path, Query: url.Values{"includeArtifacts": {"true"}}, Status: 204}},
+			Name:      "deleteAgent deleteArtifacts true",
+			Exchanges: []testkit.Exchange{{Op: "deleteAgent", Path: path, Query: url.Values{"deleteArtifacts": {"true"}}, Status: 204}},
 			Call: func(ctx context.Context, c *ba.Client) (any, error) {
-				return nil, c.Agents.Delete(ctx, id, ba.DeleteAgentParams{IncludeArtifacts: true})
+				return nil, c.Agents.Delete(ctx, id, ba.DeleteAgentParams{DeleteArtifacts: true})
 			},
 		},
 		{
@@ -237,7 +237,7 @@ func TestAgentsRequests(t *testing.T) {
 		{
 			Name: "listAgentMcpAttachments",
 			Exchanges: []testkit.Exchange{{Op: "listAgentMcpAttachments", Path: path + "/mcp-attachments", NoHeader: agentsNoUser,
-				RespBody: `{"mcpAttachments":[{"mcpConnectionId":"` + string(mcp) + `","forwardUserId":true,"forwardedMetadataKeys":["plan"],` +
+				RespBody: `{"data":[{"mcpConnectionId":"` + string(mcp) + `","forwardUserId":true,"forwardedMetadataKeys":["plan"],` +
 					`"createdAt":"2026-07-10T10:00:00.000Z","updatedAt":"2026-07-10T10:05:00.000+02:00","added":1}]}`}},
 			Call: func(ctx context.Context, c *ba.Client) (any, error) { return c.Agents.ListMCPAttachments(ctx, id) },
 			Check: func(t *testing.T, got any) {
@@ -258,14 +258,14 @@ func TestAgentsRequests(t *testing.T) {
 			Exchanges: []testkit.Exchange{{Op: "listAgentMcpAttachments", Path: path + "/mcp-attachments", RespBody: testkit.Example("listAgentMcpAttachments", 200)}},
 			Call: func(ctx context.Context, c *ba.Client) (any, error) {
 				l, err := c.Agents.ListMCPAttachments(ctx, id)
-				return map[string]any{"mcpAttachments": l}, err
+				return map[string]any{"data": l}, err
 			},
 			Example: testkit.Example("listAgentMcpAttachments", 200),
 			Check:   agentsCovers(testkit.Example("listAgentMcpAttachments", 200)),
 		},
 		{
 			Name:      "listAgentMcpAttachments empty",
-			Exchanges: []testkit.Exchange{{Op: "listAgentMcpAttachments", Path: path + "/mcp-attachments", RespBody: `{"mcpAttachments":[]}`}},
+			Exchanges: []testkit.Exchange{{Op: "listAgentMcpAttachments", Path: path + "/mcp-attachments", RespBody: `{"data":[]}`}},
 			Call:      func(ctx context.Context, c *ba.Client) (any, error) { return c.Agents.ListMCPAttachments(ctx, id) },
 			Check: func(t *testing.T, got any) {
 				if g := got.([]ba.MCPAttachment); len(g) != 0 {
@@ -673,13 +673,21 @@ func TestAgentsErrors(t *testing.T) {
 			func(ctx context.Context, c *ba.Client) error {
 				return agentsErr(c.Agents.Create(ctx, ba.CreateAgentParams{Name: "a"}))
 			}},
+		{testkit.Exchange{Op: "createAgent", Path: "/v1/agents", Body: `{"name":"a"}`}, 404, ba.ErrorCodeMCPConnectionNotFound,
+			func(ctx context.Context, c *ba.Client) error {
+				return agentsErr(c.Agents.Create(ctx, ba.CreateAgentParams{Name: "a"}))
+			}},
+		{testkit.Exchange{Op: "createAgent", Path: "/v1/agents", Body: `{"name":"a"}`}, 422, ba.ErrorCodeModelNotFound,
+			func(ctx context.Context, c *ba.Client) error {
+				return agentsErr(c.Agents.Create(ctx, ba.CreateAgentParams{Name: "a"}))
+			}},
 		{testkit.Exchange{Op: "getAgent", Path: path}, 404, ba.ErrorCodeNotFound,
 			func(ctx context.Context, c *ba.Client) error { return agentsErr(c.Agents.Get(ctx, id)) }},
 		{testkit.Exchange{Op: "updateAgent", Path: path, Body: `{"name":"a"}`}, 409, ba.ErrorCodeAdminAgentManaged,
 			func(ctx context.Context, c *ba.Client) error {
 				return agentsErr(c.Agents.Update(ctx, id, ba.UpdateAgentParams{Name: new("a")}))
 			}},
-		{testkit.Exchange{Op: "deleteAgent", Path: path, Query: url.Values{"includeArtifacts": {"false"}}}, 409, ba.ErrorCodeAdminAgentManaged,
+		{testkit.Exchange{Op: "deleteAgent", Path: path, Query: url.Values{"deleteArtifacts": {"false"}}}, 409, ba.ErrorCodeAdminAgentManaged,
 			func(ctx context.Context, c *ba.Client) error { return c.Agents.Delete(ctx, id, ba.DeleteAgentParams{}) }},
 		{testkit.Exchange{Op: "disableAgent", Path: path + "/disable"}, 403, ba.ErrorCodeInsufficientScope,
 			func(ctx context.Context, c *ba.Client) error { return agentsErr(c.Agents.Disable(ctx, id)) }},

@@ -34,9 +34,9 @@ func TestArtifactsRequests(t *testing.T) {
 		{
 			Name: "listArtifacts",
 			Exchanges: []testkit.Exchange{{Op: "listArtifacts", Path: "/v1/artifacts", NoHeader: tasksNoUser,
-				Query: url.Values{"agentId": {string(agent)}, "sessionId": {string(session)}, "cursor": {"c1"}}, RespBody: ex("listArtifacts", 200)}},
+				Query: url.Values{"agentId": {string(agent)}, "sessionId": {string(session)}, "cursor": {"c1"}, "limit": {"50"}}, RespBody: ex("listArtifacts", 200)}},
 			Call: func(ctx context.Context, c *ba.Client) (any, error) {
-				return c.Artifacts.List(ctx, ba.ListArtifactsParams{AgentID: &agent, SessionID: &session, Cursor: new("c1")})
+				return c.Artifacts.List(ctx, ba.ListArtifactsParams{AgentID: &agent, SessionID: &session, Cursor: new("c1"), Limit: new(50)})
 			},
 			Check: func(t *testing.T, got any) {
 				tasksCovers(ex("listArtifacts", 200))(t, got)
@@ -121,7 +121,7 @@ func TestArtifactsUserClient(t *testing.T) {
 
 func TestArtifactsAll(t *testing.T) {
 	_, agent, _ := artifactsIDs()
-	item := func(id string) string { return `{"artifactId":"` + id + `"}` }
+	item := func(id string) string { return `{"id":"` + id + `"}` }
 	m := testkit.New(t)
 	for range 2 {
 		m.Expect(testkit.Exchange{Op: "listArtifacts", Path: "/v1/artifacts", Query: url.Values{"agentId": {string(agent)}}, RespBody: `{"data":[` + item("a1") + `],"nextCursor":"c2"}`})

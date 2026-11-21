@@ -332,17 +332,19 @@ var skillCopyResultVariants = map[string]func([]byte) (SkillCopyResult, error){
 	"failed":  variant(func(w skillCopyFailedWire) SkillCopyResult { return SkillCopyFailed(w) }),
 }
 
-// decodeSkillCopyResults decodes the copySkill body, a list of SkillCopyResult.
+// decodeSkillCopyResults decodes the copySkill body, {"data": [SkillCopyResult]}.
 func decodeSkillCopyResults(b *body, err error) ([]SkillCopyResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	var raws []json.RawMessage
-	if err := json.Unmarshal(b.data, &raws); err != nil {
+	var env struct {
+		Data []json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(b.data, &env); err != nil {
 		return nil, b.decodeError(err)
 	}
-	out := make([]SkillCopyResult, len(raws))
-	for i, raw := range raws {
+	out := make([]SkillCopyResult, len(env.Data))
+	for i, raw := range env.Data {
 		r, err := decodeUnion("SkillCopyResult", raw, skillCopyResultVariants, func(tag string, raw json.RawMessage) SkillCopyResult {
 			return UnknownSkillCopyResult{Status: tag, Raw: raw}
 		})

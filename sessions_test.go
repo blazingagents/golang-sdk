@@ -637,6 +637,10 @@ func TestSessionsErrors(t *testing.T) {
 			func(ctx context.Context, c *ba.Client) (any, error) {
 				return c.Sessions.List(ctx, agent, ba.ListSessionsParams{})
 			}},
+		{testkit.Exchange{Op: "listSessions", Path: "/v1/agents/" + string(agent) + "/sessions", Status: 404}, ba.ErrorCodeNotFound,
+			func(ctx context.Context, c *ba.Client) (any, error) {
+				return c.Sessions.List(ctx, agent, ba.ListSessionsParams{})
+			}},
 		{testkit.Exchange{Op: "listLatestSessions", Path: "/v1/sessions/latest", Status: 400}, ba.ErrorCodeInvalidCursor,
 			func(ctx context.Context, c *ba.Client) (any, error) {
 				return c.Sessions.ListLatest(ctx, ba.ListLatestSessionsParams{})

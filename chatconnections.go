@@ -170,7 +170,7 @@ var errNilParams = &ArgumentError{Name: "params", Reason: "nil"}
 // List returns every chat connection of the tenant (listChatConnections).
 // See https://docs.blazingagents.com/api-reference/rest-api/chat-connections#list-chat-connections.
 func (s *ChatConnectionsService) List(ctx context.Context, opts ...RequestOption) ([]ChatConnection, error) {
-	return list[ChatConnection]("chatConnections")(s.s.send(ctx, op.ListChatConnections(), nil, opts))
+	return list[ChatConnection](s.s.send(ctx, op.ListChatConnections(), nil, opts))
 }
 
 // Create connects an agent to Slack or Telegram (createChatConnection). params is a

@@ -1,5 +1,58 @@
 # Changelog
 
+## Unreleased
+
+The API's shapes now follow one rule per subject, so a list, a record, a retry and a missing record read the same on every resource. Every list returns its records under `data`, and a single record comes back bare. The SDK's methods decode those envelopes into the values they returned before, so only the changes below touch your code.
+
+### Changed
+
+- `MerchantBindings.List` and `MerchantUsageEvents.List` return `*Page[MerchantBinding]` and `*Page[MerchantUsageEvent]`, the page every cursor list returns, with the records in `Data`. `MerchantBindingList`, `MerchantUsageEventList` and their `Bindings` and `Events` fields are gone. `All` is unchanged.
+
+  ```go
+  page, err := client.MerchantBindings.List(ctx, ba.ListMerchantBindingsParams{})
+  for _, binding := range page.Data { // was page.Bindings
+  	fmt.Println(binding.UserID)
+  }
+  ```
+
+- `DeleteAgentParams.IncludeArtifacts` is `DeleteArtifacts`, the name `DeleteSessionParams` uses.
+
+  ```go
+  err := client.Agents.Delete(ctx, agentID, ba.DeleteAgentParams{DeleteArtifacts: true})
+  ```
+
+- `CreateTaskParams.IdempotencyKey` and `SubmitTaskParams.IdempotencyKey` are a `string`, where they were a `*string`. The SDK sends the key as the `Idempotency-Key` header, as it does for skills and forks, and sends no header when it is empty. `Tasks.Submit` sends no body.
+
+  ```go
+  task, err := client.Tasks.Create(ctx, ba.CreateTaskParams{
+  	IdempotencyKey: "nightly-report-v1", // was new("nightly-report-v1")
+  	AgentID:        agentID,
+  	Name:           "Nightly report",
+  	Prompt:         "Summarise yesterday's refunds.",
+  })
+  ```
+
+- `Agents.Update` and `Workspaces.Update` send `PATCH`, since they change only the fields you send.
+- Encoding an `Artifact` writes its ID as `id`, where it wrote `artifactId`, and encoding a `SubmitInputResult` writes `input`, where it wrote `data`. The methods still take an `ArtifactID`.
+- A record the path names answers `404 not_found` when it is missing: a provider, a workspace, a skill, the merchant connection, a merchant binding or a merchant usage event. `Sessions.List` answers `404 not_found` for an agent that does not exist, where it returned an empty page. A record a request reaches through another keeps its own code, such as `ErrorCodeProviderNotFound` for an agent's provider on a turn. An MCP connection that `Agents.Create` or `Agents.Update` lists answers `404 mcp_connection_not_found`, and a model its provider does not offer answers `422 model_not_found`, where it answered `400`.
+
+### Added
+
+- `ListArtifactsParams.Limit` sets the page size, from 1 to 100.
+- `TenantID` on `Provider`, `ProviderSummary`, `MCPConnection`, `SessionSummary` (which `Session` and `LatestSession` embed), `MerchantConnection` and `MerchantUsageEvent`, like every other record.
+- `ErrorCodeMCPConnectionNotFound` (`mcp_connection_not_found`).
+
+### Removed
+
+- The error codes `ErrorCodeSkillNotFound`, `ErrorCodeMerchantConnectionNotFound`, `ErrorCodeMerchantBindingNotFound`, `ErrorCodeMerchantEventNotFound` and `ErrorCodeAgentMCPConnectionNotFound`. Compare with `ErrorCodeNotFound`, or with `ErrorCodeMCPConnectionNotFound` for an agent's MCP connection.
+
+  ```go
+  var apiErr *ba.APIError
+  if errors.As(err, &apiErr) && apiErr.Code == ba.ErrorCodeNotFound { // was ErrorCodeSkillNotFound
+  	// the skill does not exist
+  }
+  ```
+
 ## 0.12.0 (2026-11-21)
 
 ### Removed

@@ -14,6 +14,7 @@ import (
 // See https://docs.blazingagents.com/api-reference/rest-api/merchant.
 type MerchantConnection struct {
 	ID                MerchantConnectionID `json:"id"`
+	TenantID          TenantID             `json:"tenantId"`
 	Provider          MerchantProvider     `json:"provider"`
 	Environment       MerchantEnvironment  `json:"environment"`
 	MerchantAccountID string               `json:"merchantAccountId"`
@@ -93,15 +94,6 @@ type MerchantBinding struct {
 	UpdatedAt  time.Time `json:"updatedAt"`
 }
 
-// MerchantBindingList is one page of bindings.
-type MerchantBindingList struct {
-	Bindings   []MerchantBinding `json:"bindings"`
-	NextCursor string            `json:"nextCursor"` // "" on the last page
-}
-
-func (l *MerchantBindingList) items() []MerchantBinding { return l.Bindings }
-func (l *MerchantBindingList) next() string             { return l.NextCursor }
-
 // ListMerchantBindingsParams filters listMerchantBindings.
 type ListMerchantBindingsParams struct {
 	UserID *string `json:"-" query:"userId"` // only this end user's binding
@@ -118,6 +110,7 @@ type SetMerchantBindingParams struct {
 // NextAction says what, if anything, to do about it.
 type MerchantUsageEvent struct {
 	ID                MerchantUsageEventID     `json:"id"`
+	TenantID          TenantID                 `json:"tenantId"`
 	TurnID            TurnID                   `json:"turnId"`
 	ConnectionID      MerchantConnectionID     `json:"connectionId"`
 	Provider          MerchantProvider         `json:"provider"`
@@ -142,15 +135,6 @@ type MerchantUsageEvent struct {
 	AcceptedAt        *time.Time               `json:"acceptedAt"`
 	NextAction        MerchantUsageEventAction `json:"nextAction"`
 }
-
-// MerchantUsageEventList is one page of usage events.
-type MerchantUsageEventList struct {
-	Events     []MerchantUsageEvent `json:"events"`
-	NextCursor string               `json:"nextCursor"` // "" on the last page
-}
-
-func (l *MerchantUsageEventList) items() []MerchantUsageEvent { return l.Events }
-func (l *MerchantUsageEventList) next() string                { return l.NextCursor }
 
 // ListMerchantUsageEventsParams filters listMerchantUsageEvents.
 type ListMerchantUsageEventsParams struct {
@@ -203,14 +187,14 @@ func (s *MerchantConnectionService) Get(ctx context.Context, opts ...RequestOpti
 // under the same conditions. Monetization stays off until the tenant enables it.
 // See https://docs.blazingagents.com/api-reference/rest-api/merchant#create-merchant-connection.
 func (s *MerchantConnectionService) Create(ctx context.Context, params CreateMerchantConnectionParams, opts ...RequestOption) (*MerchantConnection, error) {
-	return unwrap[MerchantConnection]("connection")(s.s.send(ctx, op.CreateMerchantConnection(), params, opts))
+	return decode[MerchantConnection](s.s.send(ctx, op.CreateMerchantConnection(), params, opts))
 }
 
 // Update changes the connection's guard, or rotates its credential
 // (updateMerchantConnection).
 // See https://docs.blazingagents.com/api-reference/rest-api/merchant#update-merchant-connection.
 func (s *MerchantConnectionService) Update(ctx context.Context, params UpdateMerchantConnectionParams, opts ...RequestOption) (*MerchantConnection, error) {
-	return unwrap[MerchantConnection]("connection")(s.s.send(ctx, op.UpdateMerchantConnection(), params, opts))
+	return decode[MerchantConnection](s.s.send(ctx, op.UpdateMerchantConnection(), params, opts))
 }
 
 // Retire retires the connection (retireMerchantConnection). It fails with
@@ -224,15 +208,15 @@ func (s *MerchantConnectionService) Retire(ctx context.Context, opts ...RequestO
 
 // List returns one page of the connection's customer bindings (listMerchantBindings).
 // See https://docs.blazingagents.com/api-reference/rest-api/merchant#list-merchant-bindings.
-func (s *MerchantBindingsService) List(ctx context.Context, params ListMerchantBindingsParams, opts ...RequestOption) (*MerchantBindingList, error) {
-	return decode[MerchantBindingList](s.s.send(ctx, op.ListMerchantBindings(), params, opts))
+func (s *MerchantBindingsService) List(ctx context.Context, params ListMerchantBindingsParams, opts ...RequestOption) (*Page[MerchantBinding], error) {
+	return decode[Page[MerchantBinding]](s.s.send(ctx, op.ListMerchantBindings(), params, opts))
 }
 
 // All iterates over the bindings from params.Cursor on, fetching pages as needed
 // (listMerchantBindings).
 // See https://docs.blazingagents.com/api-reference/rest-api/merchant#list-merchant-bindings.
 func (s *MerchantBindingsService) All(ctx context.Context, params ListMerchantBindingsParams, opts ...RequestOption) iter.Seq2[MerchantBinding, error] {
-	return all(ctx, func(ctx context.Context, cursor string) (*MerchantBindingList, error) {
+	return all(ctx, func(ctx context.Context, cursor string) (*Page[MerchantBinding], error) {
 		p := params
 		if cursor != "" {
 			p.Cursor = &cursor
@@ -245,7 +229,7 @@ func (s *MerchantBindingsService) All(ctx context.Context, params ListMerchantBi
 // (setMerchantBinding). userID is the ID the tenant sends with turns.
 // See https://docs.blazingagents.com/api-reference/rest-api/merchant#set-merchant-binding.
 func (s *MerchantBindingsService) Set(ctx context.Context, userID string, params SetMerchantBindingParams, opts ...RequestOption) (*MerchantBinding, error) {
-	return unwrap[MerchantBinding]("binding")(s.s.send(ctx, op.SetMerchantBinding(userID), params, opts))
+	return decode[MerchantBinding](s.s.send(ctx, op.SetMerchantBinding(userID), params, opts))
 }
 
 // Delete removes an end user's binding (deleteMerchantBinding).
@@ -256,15 +240,15 @@ func (s *MerchantBindingsService) Delete(ctx context.Context, userID string, opt
 
 // List returns one page of usage events, newest first (listMerchantUsageEvents).
 // See https://docs.blazingagents.com/api-reference/rest-api/merchant#list-merchant-usage-events.
-func (s *MerchantUsageEventsService) List(ctx context.Context, params ListMerchantUsageEventsParams, opts ...RequestOption) (*MerchantUsageEventList, error) {
-	return decode[MerchantUsageEventList](s.s.send(ctx, op.ListMerchantUsageEvents(), params, opts))
+func (s *MerchantUsageEventsService) List(ctx context.Context, params ListMerchantUsageEventsParams, opts ...RequestOption) (*Page[MerchantUsageEvent], error) {
+	return decode[Page[MerchantUsageEvent]](s.s.send(ctx, op.ListMerchantUsageEvents(), params, opts))
 }
 
 // All iterates over the usage events from params.Cursor on, fetching pages as needed
 // (listMerchantUsageEvents).
 // See https://docs.blazingagents.com/api-reference/rest-api/merchant#list-merchant-usage-events.
 func (s *MerchantUsageEventsService) All(ctx context.Context, params ListMerchantUsageEventsParams, opts ...RequestOption) iter.Seq2[MerchantUsageEvent, error] {
-	return all(ctx, func(ctx context.Context, cursor string) (*MerchantUsageEventList, error) {
+	return all(ctx, func(ctx context.Context, cursor string) (*Page[MerchantUsageEvent], error) {
 		p := params
 		if cursor != "" {
 			p.Cursor = &cursor
@@ -276,13 +260,13 @@ func (s *MerchantUsageEventsService) All(ctx context.Context, params ListMerchan
 // Summary returns the usage event counts and daily totals (getMerchantUsageSummary).
 // See https://docs.blazingagents.com/api-reference/rest-api/merchant#get-merchant-usage-summary.
 func (s *MerchantUsageEventsService) Summary(ctx context.Context, params MerchantUsageSummaryParams, opts ...RequestOption) (*MerchantUsageSummary, error) {
-	return unwrap[MerchantUsageSummary]("summary")(s.s.send(ctx, op.GetMerchantUsageSummary(), params, opts))
+	return decode[MerchantUsageSummary](s.s.send(ctx, op.GetMerchantUsageSummary(), params, opts))
 }
 
 // Get returns a usage event (getMerchantUsageEvent).
 // See https://docs.blazingagents.com/api-reference/rest-api/merchant#get-merchant-usage-event.
 func (s *MerchantUsageEventsService) Get(ctx context.Context, eventID MerchantUsageEventID, opts ...RequestOption) (*MerchantUsageEvent, error) {
-	return unwrap[MerchantUsageEvent]("event")(s.s.send(ctx, op.GetMerchantUsageEvent(string(eventID)), nil, opts))
+	return decode[MerchantUsageEvent](s.s.send(ctx, op.GetMerchantUsageEvent(string(eventID)), nil, opts))
 }
 
 // Retry sends a failed event, or a pending one whose delivery stopped, to the
@@ -292,11 +276,11 @@ func (s *MerchantUsageEventsService) Get(ctx context.Context, eventID MerchantUs
 // by event ID.
 // See https://docs.blazingagents.com/api-reference/rest-api/merchant#retry-merchant-usage-event.
 func (s *MerchantUsageEventsService) Retry(ctx context.Context, eventID MerchantUsageEventID, opts ...RequestOption) (*MerchantUsageEvent, error) {
-	return unwrap[MerchantUsageEvent]("event")(s.s.send(ctx, op.RetryMerchantUsageEvent(string(eventID)), nil, opts))
+	return decode[MerchantUsageEvent](s.s.send(ctx, op.RetryMerchantUsageEvent(string(eventID)), nil, opts))
 }
 
 // Discard stops delivery of an event and marks it discarded (discardMerchantUsageEvent).
 // See https://docs.blazingagents.com/api-reference/rest-api/merchant#discard-merchant-usage-event.
 func (s *MerchantUsageEventsService) Discard(ctx context.Context, eventID MerchantUsageEventID, opts ...RequestOption) (*MerchantUsageEvent, error) {
-	return unwrap[MerchantUsageEvent]("event")(s.s.send(ctx, op.DiscardMerchantUsageEvent(string(eventID)), nil, opts))
+	return decode[MerchantUsageEvent](s.s.send(ctx, op.DiscardMerchantUsageEvent(string(eventID)), nil, opts))
 }

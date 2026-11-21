@@ -78,11 +78,11 @@ func TestTasksRequests(t *testing.T) {
 		},
 		{
 			Name: "createTask",
-			Exchanges: []testkit.Exchange{{Op: "createTask", Path: "/v1/tasks", NoHeader: tasksNoUser, Status: 201, RespBody: ex("createTask", 201),
-				Body: `{"idempotencyKey":"k","agentId":"` + string(agent) + `","name":"n","prompt":"p","schedule":{"kind":"once","config":{"at":"2026-07-13T08:00:00Z"}},"enabled":false,"userId":"user_42","metadata":{"team":"support"}}`}},
+			Exchanges: []testkit.Exchange{{Op: "createTask", Path: "/v1/tasks", NoHeader: tasksNoUser, Header: http.Header{"Idempotency-Key": {"k"}}, Status: 201, RespBody: ex("createTask", 201),
+				Body: `{"agentId":"` + string(agent) + `","name":"n","prompt":"p","schedule":{"kind":"once","config":{"at":"2026-07-13T08:00:00Z"}},"enabled":false,"userId":"user_42","metadata":{"team":"support"}}`}},
 			Call: func(ctx context.Context, c *ba.Client) (any, error) {
 				at := time.Date(2026, 7, 13, 9, 0, 0, 0, time.FixedZone("x", 3600))
-				return c.Tasks.Create(ctx, ba.CreateTaskParams{IdempotencyKey: new("k"), AgentID: agent, Name: "n", Prompt: "p", Enabled: new(false), UserID: new("user_42"),
+				return c.Tasks.Create(ctx, ba.CreateTaskParams{IdempotencyKey: "k", AgentID: agent, Name: "n", Prompt: "p", Enabled: new(false), UserID: new("user_42"),
 					Metadata: ba.Metadata{"team": "support"}, Schedule: ba.Value[ba.Schedule](ba.ScheduleOnce{At: at})})
 			},
 			Check: func(t *testing.T, got any) {
@@ -95,7 +95,7 @@ func TestTasksRequests(t *testing.T) {
 		},
 		{
 			Name: "createTask submitted",
-			Exchanges: []testkit.Exchange{{Op: "createTask", Path: "/v1/tasks", NoHeader: tasksNoUser, Status: 202, RespBody: ex("createTask", 202),
+			Exchanges: []testkit.Exchange{{Op: "createTask", Path: "/v1/tasks", NoHeader: append([]string{"Idempotency-Key"}, tasksNoUser...), Status: 202, RespBody: ex("createTask", 202),
 				Body: `{"agentId":"` + string(agent) + `","name":"n","prompt":"p","submit":true}`}},
 			Call: func(ctx context.Context, c *ba.Client) (any, error) {
 				return c.Tasks.Create(ctx, ba.CreateTaskParams{AgentID: agent, Name: "n", Prompt: "p", Submit: new(true)})
@@ -141,15 +141,15 @@ func TestTasksRequests(t *testing.T) {
 		},
 		{
 			Name:      "createTaskRun",
-			Exchanges: []testkit.Exchange{{Op: "createTaskRun", Path: path + "/runs", NoHeader: tasksNoUser, Body: `{"idempotencyKey":"k"}`, Status: 202, RespBody: ex("createTaskRun", 202)}},
+			Exchanges: []testkit.Exchange{{Op: "createTaskRun", Path: path + "/runs", NoHeader: tasksNoUser, Header: http.Header{"Idempotency-Key": {"k"}}, Status: 202, RespBody: ex("createTaskRun", 202)}},
 			Call: func(ctx context.Context, c *ba.Client) (any, error) {
-				return c.Tasks.Submit(ctx, task, ba.SubmitTaskParams{IdempotencyKey: new("k")})
+				return c.Tasks.Submit(ctx, task, ba.SubmitTaskParams{IdempotencyKey: "k"})
 			},
 			Check: tasksCovers(ex("createTaskRun", 202)),
 		},
 		{
 			Name:      "createTaskRun without a key",
-			Exchanges: []testkit.Exchange{{Op: "createTaskRun", Path: path + "/runs", Body: `{}`, Status: 202, RespBody: `{"runId":"` + string(run) + `"}`}},
+			Exchanges: []testkit.Exchange{{Op: "createTaskRun", Path: path + "/runs", NoHeader: []string{"Idempotency-Key"}, Status: 202, RespBody: `{"runId":"` + string(run) + `"}`}},
 			Call: func(ctx context.Context, c *ba.Client) (any, error) {
 				return c.Tasks.Submit(ctx, task, ba.SubmitTaskParams{})
 			},
@@ -215,7 +215,7 @@ func TestTasksUserClient(t *testing.T) {
 	header := http.Header{"X-Ba-User-Id": {"user_42"}}
 	path := "/v1/tasks/" + string(task)
 	m.Expect(testkit.Exchange{Op: "listTasks", Path: "/v1/tasks", Header: header, RespBody: `{"data":[],"nextCursor":null}`})
-	m.Expect(testkit.Exchange{Op: "createTaskRun", Path: path + "/runs", Header: header, Body: `{}`, Status: 202, RespBody: `{"runId":"` + string(run) + `"}`})
+	m.Expect(testkit.Exchange{Op: "createTaskRun", Path: path + "/runs", Header: header, Status: 202, RespBody: `{"runId":"` + string(run) + `"}`})
 	m.Expect(testkit.Exchange{Op: "cancelTaskRun", Path: path + "/runs/" + string(run) + "/cancel", Header: header, Status: 204})
 	ctx := context.Background()
 	if _, err := user.Tasks.List(ctx, ba.ListTasksParams{}); err != nil {
@@ -520,7 +520,7 @@ func TestTasksErrors(t *testing.T) {
 			return c.Tasks.Update(ctx, task, ba.UpdateTaskParams{Name: new("n")})
 		}},
 		{"deleteTask", path, nil, "", 409, ba.ErrorCodeTaskActiveRunExists, "A run is active", func(c *ba.Client) (any, error) { return nil, c.Tasks.Delete(ctx, task) }},
-		{"createTaskRun", path + "/runs", nil, `{}`, 409, ba.ErrorCodeTaskActiveRunExists, "A run is active", func(c *ba.Client) (any, error) {
+		{"createTaskRun", path + "/runs", nil, "", 409, ba.ErrorCodeTaskActiveRunExists, "A run is active", func(c *ba.Client) (any, error) {
 			return c.Tasks.Submit(ctx, task, ba.SubmitTaskParams{})
 		}},
 		{"listTaskRuns", path + "/runs", nil, "", 404, ba.ErrorCodeNotFound, "Task not found", func(c *ba.Client) (any, error) {

@@ -24,6 +24,9 @@ func skillsIDs() (ba.AgentID, ba.SkillID) {
 	return ba.AgentID(testkit.ID(op.IDPatterns["AgentID"])), ba.SkillID(testkit.ID(op.IDPatterns["SkillID"]))
 }
 
+// skillsCopied wraps decoded copy results in their envelope, to compare them with a response body.
+func skillsCopied(got any) any { return map[string]any{"data": got} }
+
 // skillsRead reads a download to the end and closes it.
 func skillsRead(d *ba.Download, err error) (any, error) {
 	if err != nil {
@@ -43,6 +46,8 @@ func TestSkillsRequests(t *testing.T) {
 	covers := func(example string) func(*testing.T, any) {
 		return func(t *testing.T, got any) { testkit.CoversExample(t, example, got) }
 	}
+	unknownCopy := testkit.Exchange{Op: "copySkill", Path: path + "/copies", Body: `{"agentIds":["` + string(agent) + `"]}`,
+		RespBody: `{"data":[{"agentId":"` + string(agent) + `","status":"queued","position":3}]}`}
 	testkit.Run(t, []testkit.Case{
 		{
 			Name: "createSkill sends path SKILL.md",
@@ -158,9 +163,9 @@ func TestSkillsRequests(t *testing.T) {
 			Call: func(ctx context.Context, c *ba.Client) (any, error) {
 				return c.Skills.Copy(ctx, agent, skill, ba.CopySkillParams{AgentIDs: []ba.AgentID{agent}})
 			},
-			Example: testkit.Example("copySkill", 200),
 			Check: func(t *testing.T, got any) {
-				covers(testkit.Example("copySkill", 200))(t, got)
+				testkit.MatchesExample(t, testkit.Example("copySkill", 200), skillsCopied(got))
+				covers(testkit.Example("copySkill", 200))(t, skillsCopied(got))
 				rs := got.([]ba.SkillCopyResult)
 				created, ok := rs[0].(ba.SkillCopyCreated)
 				failed, ok2 := rs[1].(ba.SkillCopyFailed)
@@ -171,14 +176,13 @@ func TestSkillsRequests(t *testing.T) {
 			},
 		},
 		{
-			Name: "copySkill unknown status",
-			Exchanges: []testkit.Exchange{{Op: "copySkill", Path: path + "/copies", Body: `{"agentIds":["` + string(agent) + `"]}`,
-				RespBody: `[{"agentId":"` + string(agent) + `","status":"queued","position":3}]`}},
+			Name:      "copySkill unknown status",
+			Exchanges: []testkit.Exchange{unknownCopy},
 			Call: func(ctx context.Context, c *ba.Client) (any, error) {
 				return c.Skills.Copy(ctx, agent, skill, ba.CopySkillParams{AgentIDs: []ba.AgentID{agent}})
 			},
-			Unknown: true,
 			Check: func(t *testing.T, got any) {
+				testkit.UnknownRoundTrip(t, unknownCopy, skillsCopied(got))
 				if u, ok := got.([]ba.SkillCopyResult)[0].(ba.UnknownSkillCopyResult); !ok || u.Status != "queued" {
 					t.Fatalf("decoded %#v", got)
 				}
@@ -186,7 +190,7 @@ func TestSkillsRequests(t *testing.T) {
 		},
 		{
 			Name:      "copySkill empty result",
-			Exchanges: []testkit.Exchange{{Op: "copySkill", Path: path + "/copies", Body: `{"agentIds":["` + string(agent) + `"]}`, RespBody: `[]`}},
+			Exchanges: []testkit.Exchange{{Op: "copySkill", Path: path + "/copies", Body: `{"agentIds":["` + string(agent) + `"]}`, RespBody: `{"data":[]}`}},
 			Call: func(ctx context.Context, c *ba.Client) (any, error) {
 				return c.Skills.Copy(ctx, agent, skill, ba.CopySkillParams{AgentIDs: []ba.AgentID{agent}})
 			},
@@ -319,12 +323,12 @@ func TestSkillsDecode(t *testing.T) {
 		{
 			Name: "failed copy keeps the error details",
 			Exchanges: []testkit.Exchange{{Op: "copySkill", Path: path + "/copies", Body: `{"agentIds":["` + string(agent) + `"]}`,
-				RespBody: `[{"agentId":"` + string(agent) + `","status":"failed","error":{"code":"skill_limit_reached","message":"Too many","details":{"limit":20}}}]`}},
+				RespBody: `{"data":[{"agentId":"` + string(agent) + `","status":"failed","error":{"code":"skill_limit_reached","message":"Too many","details":{"limit":20}}}]}`}},
 			Call: func(ctx context.Context, c *ba.Client) (any, error) {
 				return c.Skills.Copy(ctx, agent, skill, ba.CopySkillParams{AgentIDs: []ba.AgentID{agent}})
 			},
-			Example: `[{"agentId":"` + string(agent) + `","status":"failed","error":{"code":"skill_limit_reached","message":"Too many","details":{"limit":20}}}]`,
 			Check: func(t *testing.T, got any) {
+				testkit.MatchesExample(t, `{"data":[{"agentId":"`+string(agent)+`","status":"failed","error":{"code":"skill_limit_reached","message":"Too many","details":{"limit":20}}}]}`, skillsCopied(got))
 				f := got.([]ba.SkillCopyResult)[0].(ba.SkillCopyFailed)
 				want := ba.SkillCopyFailed{AgentID: agent, Error: ba.SkillCopyError{Code: "skill_limit_reached", Message: "Too many", Details: json.RawMessage(`{"limit":20}`)}}
 				if !reflect.DeepEqual(f, want) {
@@ -382,12 +386,12 @@ func TestSkillsCopyDecodeErrors(t *testing.T) {
 	path := fmt.Sprintf("/v1/agents/%s/skills/%s/copies", agent, skill)
 	body := `{"agentIds":["` + string(agent) + `"]}`
 	for name, tc := range map[string]struct{ resp, want string }{
-		"not a list":            {`{"status":"created"}`, "blazingagents: copySkill: decode response: json: "},
-		"missing required":      {`[{"agentId":"` + string(agent) + `","status":"created"}]`, `blazingagents: copySkill: decode response: SkillCopyResult created: missing "skill"`},
-		"null required":         {`[{"agentId":"` + string(agent) + `","status":"failed","error":null}]`, `blazingagents: copySkill: decode response: SkillCopyResult failed: missing "error"`},
-		"missing status":        {`[{"agentId":"` + string(agent) + `"}]`, `blazingagents: copySkill: decode response: SkillCopyResult: missing "status"`},
-		"null status":           {`[{"agentId":"` + string(agent) + `","status":null}]`, `blazingagents: copySkill: decode response: SkillCopyResult: "status" is null`},
-		"known with a bad body": {`[{"agentId":"` + string(agent) + `","status":"created","skill":{"id":7}}]`, "blazingagents: copySkill: decode response: "},
+		"not an envelope":       {`[]`, "blazingagents: copySkill: decode response: json: "},
+		"missing required":      {`{"data":[{"agentId":"` + string(agent) + `","status":"created"}]}`, `blazingagents: copySkill: decode response: SkillCopyResult created: missing "skill"`},
+		"null required":         {`{"data":[{"agentId":"` + string(agent) + `","status":"failed","error":null}]}`, `blazingagents: copySkill: decode response: SkillCopyResult failed: missing "error"`},
+		"missing status":        {`{"data":[{"agentId":"` + string(agent) + `"}]}`, `blazingagents: copySkill: decode response: SkillCopyResult: missing "status"`},
+		"null status":           {`{"data":[{"agentId":"` + string(agent) + `","status":null}]}`, `blazingagents: copySkill: decode response: SkillCopyResult: "status" is null`},
+		"known with a bad body": {`{"data":[{"agentId":"` + string(agent) + `","status":"created","skill":{"id":7}}]}`, "blazingagents: copySkill: decode response: "},
 	} {
 		t.Run(name, func(t *testing.T) {
 			m := testkit.New(t)
@@ -434,10 +438,10 @@ func TestSkillsReadFile(t *testing.T) {
 	})
 	t.Run("API error", func(t *testing.T) {
 		m := testkit.New(t)
-		m.Expect(testkit.Exchange{Op: "getSkillFile", Path: path, Query: q, Status: 404, RespBody: `{"error":{"code":"skill_not_found","message":"No skill"}}`})
+		m.Expect(testkit.Exchange{Op: "getSkillFile", Path: path, Query: q, Status: 404, RespBody: `{"error":{"code":"not_found","message":"No skill"}}`})
 		d, err := m.Client().Skills.ReadFile(context.Background(), agent, skill, "policy.md")
 		var apiErr *ba.APIError
-		if d != nil || !errors.As(err, &apiErr) || apiErr.Code != ba.ErrorCodeSkillNotFound || err.Error() != "blazingagents: getSkillFile: 404 skill_not_found: No skill" {
+		if d != nil || !errors.As(err, &apiErr) || apiErr.Code != ba.ErrorCodeNotFound || err.Error() != "blazingagents: getSkillFile: 404 not_found: No skill" {
 			t.Fatalf("download %v, error %v", d, err)
 		}
 	})
@@ -510,7 +514,7 @@ func TestSkillsErrors(t *testing.T) {
 			func(ctx context.Context, c *ba.Client) error {
 				return agentsErr(c.Skills.List(ctx, agent, ba.ListSkillsParams{}))
 			}},
-		{testkit.Exchange{Op: "getSkill", Path: path}, 404, ba.ErrorCodeSkillNotFound,
+		{testkit.Exchange{Op: "getSkill", Path: path}, 404, ba.ErrorCodeNotFound,
 			func(ctx context.Context, c *ba.Client) error { return agentsErr(c.Skills.Get(ctx, agent, skill)) }},
 		{testkit.Exchange{Op: "deleteSkill", Path: path}, 503, ba.ErrorCodeServiceUnavailable,
 			func(ctx context.Context, c *ba.Client) error { return c.Skills.Delete(ctx, agent, skill) }},
@@ -522,7 +526,7 @@ func TestSkillsErrors(t *testing.T) {
 			func(ctx context.Context, c *ba.Client) error {
 				return agentsErr(c.Skills.ReplaceFile(ctx, agent, skill, "policy.md", strings.NewReader("x")))
 			}},
-		{testkit.Exchange{Op: "deleteSkillFile", Path: path + "/files", Query: files}, 404, ba.ErrorCodeSkillNotFound,
+		{testkit.Exchange{Op: "deleteSkillFile", Path: path + "/files", Query: files}, 404, ba.ErrorCodeNotFound,
 			func(ctx context.Context, c *ba.Client) error {
 				return agentsErr(c.Skills.DeleteFile(ctx, agent, skill, "policy.md"))
 			}},

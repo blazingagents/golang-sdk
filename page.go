@@ -14,7 +14,7 @@ type Page[T any] struct {
 func (p *Page[T]) items() []T   { return p.Data }
 func (p *Page[T]) next() string { return p.NextCursor }
 
-// pager is implemented by Page and by every list page with another shape.
+// pager is implemented by Page and by the list pages that carry more than data and nextCursor.
 type pager[T any] interface {
 	items() []T
 	next() string

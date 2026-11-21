@@ -11,6 +11,7 @@ import (
 // SessionSummary is a session in a list.
 type SessionSummary struct {
 	ID                 SessionID `json:"id"`
+	TenantID           TenantID  `json:"tenantId"`
 	MessageCount       int64     `json:"messageCount"`
 	LastMessagePreview *string   `json:"lastMessagePreview"`
 	UserID             string    `json:"userId"` // "" for a session without an end user
@@ -116,7 +117,7 @@ func (l *SessionInputList) next() string          { return l.NextCursor }
 
 // SubmitInputResult is the accepted input and the session's activity.
 type SubmitInputResult struct {
-	Input    SessionInput    `json:"data"`
+	Input    SessionInput    `json:"input"`
 	Activity SessionActivity `json:"activity"`
 }
 

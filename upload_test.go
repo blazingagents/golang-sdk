@@ -156,8 +156,8 @@ func TestDownload(t *testing.T) {
 	if _, err := c.Skills.ReadFile(ctx, "", skill, "a.md"); err == nil || err.Error() != `blazingagents: invalid argument agentId: "" is not a valid path segment` {
 		t.Fatalf("empty agent: %v", err)
 	}
-	m.Expect(testkit.Exchange{Op: "getSkillFile", Path: path, Query: q, Status: 404, RespBody: `{"error":{"code":"skill_not_found","message":"No skill"}}`})
-	if _, err := c.Skills.ReadFile(ctx, agent, skill, "a.md"); err == nil || err.Error() != "blazingagents: getSkillFile: 404 skill_not_found: No skill" {
+	m.Expect(testkit.Exchange{Op: "getSkillFile", Path: path, Query: q, Status: 404, RespBody: `{"error":{"code":"not_found","message":"No skill"}}`})
+	if _, err := c.Skills.ReadFile(ctx, agent, skill, "a.md"); err == nil || err.Error() != "blazingagents: getSkillFile: 404 not_found: No skill" {
 		t.Fatalf("API error: %v", err)
 	}
 }

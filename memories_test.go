@@ -16,16 +16,6 @@ import (
 	"github.com/blazingagents/golang-sdk/internal/testkit"
 )
 
-// memoriesInner is the memory inside an operation's {"memory": ...} example.
-func memoriesInner(t *testing.T, opID string, status int) string {
-	t.Helper()
-	var env struct{ Memory any }
-	if err := jsonUnmarshalString(testkit.Example(opID, status), &env); err != nil {
-		t.Fatal(err)
-	}
-	return jsonString(env.Memory)
-}
-
 func TestMemoriesRequests(t *testing.T) {
 	agent := ba.AgentID(testkit.ID(op.IDPatterns["AgentID"]))
 	memory := ba.MemoryID(testkit.ID(op.IDPatterns["MemoryID"]))
@@ -36,7 +26,7 @@ func TestMemoriesRequests(t *testing.T) {
 		return func(t *testing.T, got any) { testkit.CoversExample(t, example, got) }
 	}
 	listEx := testkit.Example("listMemories", 200)
-	created, got, updated := memoriesInner(t, "createMemory", 201), memoriesInner(t, "getMemory", 200), memoriesInner(t, "updateMemory", 200)
+	created, got, updated := testkit.Example("createMemory", 201), testkit.Example("getMemory", 200), testkit.Example("updateMemory", 200)
 	testkit.Run(t, []testkit.Case{
 		{
 			Name: "listMemories sends every filter",
@@ -138,16 +128,14 @@ func TestMemoriesAll(t *testing.T) {
 	}})
 }
 
-func TestMemoriesEnvelope(t *testing.T) {
+func TestMemoriesDecodeErrors(t *testing.T) {
 	agent := ba.AgentID(testkit.ID(op.IDPatterns["AgentID"]))
 	memory := ba.MemoryID(testkit.ID(op.IDPatterns["MemoryID"]))
 	path := "/v1/agents/" + string(agent) + "/memories/" + string(memory)
+	// encoding/json wording differs between Go releases, so these compare a prefix.
 	for name, tc := range map[string]struct{ body, err string }{
-		"null memory":    {`{"memory":null}`, `blazingagents: getMemory: decode response: "memory" is null`},
-		"missing memory": {`{}`, `blazingagents: getMemory: decode response: "memory" is null`},
-		// encoding/json wording differs between Go releases, so these compare a prefix.
 		"not an object": {`[]`, "blazingagents: getMemory: decode response: json: cannot unmarshal array"},
-		"bad memory":    {`{"memory":{"id":5}}`, "blazingagents: getMemory: decode response: json: cannot unmarshal number"},
+		"bad memory":    {`{"id":5}`, "blazingagents: getMemory: decode response: json: cannot unmarshal number"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			m := testkit.New(t)
