@@ -10,6 +10,7 @@ import (
 // ProviderSummary is a provider in the list of listProviders.
 type ProviderSummary struct {
 	ID           ProviderID   `json:"id"`
+	TenantID     TenantID     `json:"tenantId"`
 	Name         string       `json:"name"`
 	ProviderType ProviderType `json:"providerType"`
 	CreatedAt    time.Time    `json:"createdAt"`
@@ -20,6 +21,7 @@ type ProviderSummary struct {
 // characters in KeyFragment.
 type Provider struct {
 	ID           ProviderID   `json:"id"`
+	TenantID     TenantID     `json:"tenantId"`
 	Name         string       `json:"name"`
 	ProviderType ProviderType `json:"providerType"`
 	BaseURL      *string      `json:"baseUrl"`
@@ -82,7 +84,7 @@ type thinkingLevelsQuery struct {
 // List lists the tenant's providers. It sends listProviders:
 // https://docs.blazingagents.com/api-reference/rest-api/providers#list-providers
 func (s *ProvidersService) List(ctx context.Context, opts ...RequestOption) ([]ProviderSummary, error) {
-	return list[ProviderSummary]("providers")(s.s.send(ctx, op.ListProviders(), nil, opts))
+	return list[ProviderSummary](s.s.send(ctx, op.ListProviders(), nil, opts))
 }
 
 // Create adds a provider. It sends createProvider:
@@ -112,7 +114,7 @@ func (s *ProvidersService) Delete(ctx context.Context, providerID ProviderID, pa
 // ListModels lists the models a provider offers. It sends listProviderModels:
 // https://docs.blazingagents.com/api-reference/rest-api/providers#list-provider-models
 func (s *ProvidersService) ListModels(ctx context.Context, providerID ProviderID, opts ...RequestOption) ([]ProviderModel, error) {
-	return list[ProviderModel]("models")(s.s.send(ctx, op.ListProviderModels(string(providerID)), nil, opts))
+	return list[ProviderModel](s.s.send(ctx, op.ListProviderModels(string(providerID)), nil, opts))
 }
 
 // ThinkingLevels returns the thinking levels a model accepts on the provider; model is the

@@ -100,7 +100,7 @@ type UpdateAgentParams struct {
 
 // DeleteAgentParams is the query of deleteAgent.
 type DeleteAgentParams struct {
-	IncludeArtifacts bool `json:"-" query:"includeArtifacts"` // true also deletes the agent's artifacts
+	DeleteArtifacts bool `json:"-" query:"deleteArtifacts"` // true also deletes the agent's artifacts
 }
 
 // UpdateMCPAttachmentParams is the body of updateAgentMcpAttachment.
@@ -181,7 +181,7 @@ func (s *AgentsService) Update(ctx context.Context, agentID AgentID, params Upda
 	return decode[Agent](s.s.send(ctx, op.UpdateAgent(string(agentID)), params, opts))
 }
 
-// Delete deletes an agent, and its artifacts when params.IncludeArtifacts is true
+// Delete deletes an agent, and its artifacts when params.DeleteArtifacts is true
 // (deleteAgent).
 // See https://docs.blazingagents.com/api-reference/rest-api/agents#delete-agent.
 func (s *AgentsService) Delete(ctx context.Context, agentID AgentID, params DeleteAgentParams, opts ...RequestOption) error {
@@ -218,7 +218,7 @@ func (s *AgentsService) RemoveAvatar(ctx context.Context, agentID AgentID, opts 
 // (listAgentMcpAttachments).
 // See https://docs.blazingagents.com/api-reference/rest-api/agents#list-agent-mcp-attachments.
 func (s *AgentsService) ListMCPAttachments(ctx context.Context, agentID AgentID, opts ...RequestOption) ([]MCPAttachment, error) {
-	return list[MCPAttachment]("mcpAttachments")(s.s.send(ctx, op.ListAgentMCPAttachments(string(agentID)), nil, opts))
+	return list[MCPAttachment](s.s.send(ctx, op.ListAgentMCPAttachments(string(agentID)), nil, opts))
 }
 
 // UpdateMCPAttachment changes what the agent forwards to one attached MCP connection

@@ -10,7 +10,7 @@ import (
 
 // Artifact is a file an agent published.
 type Artifact struct {
-	ID        ArtifactID `json:"artifactId"`
+	ID        ArtifactID `json:"id"`
 	AgentID   AgentID    `json:"agentId"`
 	TenantID  TenantID   `json:"tenantId"`
 	SessionID SessionID  `json:"sessionId"`
@@ -30,11 +30,12 @@ type ArtifactDownloadURL struct {
 	ExpiresAt time.Time `json:"expiresAt"`
 }
 
-// ListArtifactsParams filters listArtifacts. The page size is the server's.
+// ListArtifactsParams filters listArtifacts.
 type ListArtifactsParams struct {
 	AgentID   *AgentID   `json:"-" query:"agentId"`
 	SessionID *SessionID `json:"-" query:"sessionId"`
 	Cursor    *string    `json:"-" query:"cursor"`
+	Limit     *int       `json:"-" query:"limit"`
 }
 
 // List returns one page of artifacts (listArtifacts).

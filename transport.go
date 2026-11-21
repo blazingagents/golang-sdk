@@ -520,17 +520,6 @@ func encodeBody(o *op.Operation, params any) (io.Reader, string, []string, error
 	return bytes.NewReader(data), "application/json", secrets, nil
 }
 
-// unwrap decodes a single-object envelope {"<key>": T}. A null or missing T is a *DecodeError.
-func unwrap[T any](key string) func(*body, error) (*T, error) {
-	return func(b *body, err error) (*T, error) {
-		v, err := unwrapOptional[T](key)(b, err)
-		if err == nil && v == nil {
-			return nil, b.decodeError(errors.New(strconv.Quote(key) + " is null"))
-		}
-		return v, err
-	}
-}
-
 // unwrapOptional decodes {"<key>": T | null}; null is nil, nil.
 func unwrapOptional[T any](key string) func(*body, error) (*T, error) {
 	return func(b *body, err error) (*T, error) {
@@ -552,15 +541,13 @@ func unwrapOptional[T any](key string) func(*body, error) (*T, error) {
 	}
 }
 
-// list decodes an unpaged list {"<key>": [T]}.
-func list[T any](key string) func(*body, error) ([]T, error) {
-	return func(b *body, err error) ([]T, error) {
-		v, err := unwrapOptional[[]T](key)(b, err)
-		if v == nil {
-			return nil, err
-		}
-		return *v, nil
+// list decodes an unpaged list {"data": [T]}.
+func list[T any](b *body, err error) ([]T, error) {
+	v, err := unwrapOptional[[]T]("data")(b, err)
+	if v == nil {
+		return nil, err
 	}
+	return *v, nil
 }
 
 // invalidBody fails to marshal with err, so a wire() that finds its input invalid makes the

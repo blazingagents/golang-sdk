@@ -61,11 +61,11 @@ func CancelTaskRun(taskID, runID string) UserScoped {
 	return UserScoped{Request{Op: cancelTaskRun, Segments: []string{taskID, runID}}}
 }
 
-var checkChatHealth = &Operation{ID: "checkChatHealth", Method: "POST", Path: "/v1/chat-connections/{id}/health", Params: []string{"id"}, Response: JSON, CredentialBearing: true}
+var checkChatHealth = &Operation{ID: "checkChatHealth", Method: "POST", Path: "/v1/chat-connections/{chatConnectionId}/health", Params: []string{"chatConnectionId"}, Response: JSON, CredentialBearing: true}
 
-// CheckChatHealth is POST /v1/chat-connections/{id}/health.
-func CheckChatHealth(id string) TenantOnly {
-	return TenantOnly{Request{Op: checkChatHealth, Segments: []string{id}}}
+// CheckChatHealth is POST /v1/chat-connections/{chatConnectionId}/health.
+func CheckChatHealth(chatConnectionID string) TenantOnly {
+	return TenantOnly{Request{Op: checkChatHealth, Segments: []string{chatConnectionID}}}
 }
 
 var claimChatFunctionCall = &Operation{ID: "claimChatFunctionCall", Method: "POST", Path: "/v1/agents/{agentId}/sessions/{sessionId}/function-calls/{functionCallId}/claim", Params: []string{"agentId", "sessionId", "functionCallId"}, Body: JSONBody, Response: JSON, UserScoped: true}
@@ -166,7 +166,7 @@ func CreateTask() UserScoped {
 	return UserScoped{Request{Op: createTask}}
 }
 
-var createTaskRun = &Operation{ID: "createTaskRun", Method: "POST", Path: "/v1/tasks/{taskId}/runs", Params: []string{"taskId"}, Body: JSONBody, Response: JSON, UserScoped: true}
+var createTaskRun = &Operation{ID: "createTaskRun", Method: "POST", Path: "/v1/tasks/{taskId}/runs", Params: []string{"taskId"}, Response: JSON, UserScoped: true}
 
 // CreateTaskRun is POST /v1/tasks/{taskId}/runs.
 func CreateTaskRun(taskID string) UserScoped {
@@ -180,7 +180,7 @@ func CreateWorkspace() UserScoped {
 	return UserScoped{Request{Op: createWorkspace}}
 }
 
-var deleteAgent = &Operation{ID: "deleteAgent", Method: "DELETE", Path: "/v1/agents/{agentId}", Params: []string{"agentId"}, Query: []string{"includeArtifacts"}, Response: Empty, UserScoped: true}
+var deleteAgent = &Operation{ID: "deleteAgent", Method: "DELETE", Path: "/v1/agents/{agentId}", Params: []string{"agentId"}, Query: []string{"deleteArtifacts"}, Response: Empty, UserScoped: true}
 
 // DeleteAgent is DELETE /v1/agents/{agentId}.
 func DeleteAgent(agentID string) UserScoped {
@@ -201,18 +201,18 @@ func DeleteArtifact(artifactID string) UserScoped {
 	return UserScoped{Request{Op: deleteArtifact, Segments: []string{artifactID}}}
 }
 
-var deleteChatConnection = &Operation{ID: "deleteChatConnection", Method: "DELETE", Path: "/v1/chat-connections/{id}", Params: []string{"id"}, Response: Empty, CredentialBearing: true}
+var deleteChatConnection = &Operation{ID: "deleteChatConnection", Method: "DELETE", Path: "/v1/chat-connections/{chatConnectionId}", Params: []string{"chatConnectionId"}, Response: Empty, CredentialBearing: true}
 
-// DeleteChatConnection is DELETE /v1/chat-connections/{id}.
-func DeleteChatConnection(id string) TenantOnly {
-	return TenantOnly{Request{Op: deleteChatConnection, Segments: []string{id}}}
+// DeleteChatConnection is DELETE /v1/chat-connections/{chatConnectionId}.
+func DeleteChatConnection(chatConnectionID string) TenantOnly {
+	return TenantOnly{Request{Op: deleteChatConnection, Segments: []string{chatConnectionID}}}
 }
 
-var deleteMcpConnection = &Operation{ID: "deleteMcpConnection", Method: "DELETE", Path: "/v1/mcp-connections/{id}", Params: []string{"id"}, Response: Empty, CredentialBearing: true}
+var deleteMcpConnection = &Operation{ID: "deleteMcpConnection", Method: "DELETE", Path: "/v1/mcp-connections/{mcpConnectionId}", Params: []string{"mcpConnectionId"}, Response: Empty, CredentialBearing: true}
 
-// DeleteMCPConnection is DELETE /v1/mcp-connections/{id}.
-func DeleteMCPConnection(id string) TenantOnly {
-	return TenantOnly{Request{Op: deleteMcpConnection, Segments: []string{id}}}
+// DeleteMCPConnection is DELETE /v1/mcp-connections/{mcpConnectionId}.
+func DeleteMCPConnection(mcpConnectionID string) TenantOnly {
+	return TenantOnly{Request{Op: deleteMcpConnection, Segments: []string{mcpConnectionID}}}
 }
 
 var deleteMemory = &Operation{ID: "deleteMemory", Method: "DELETE", Path: "/v1/agents/{agentId}/memories/{memoryId}", Params: []string{"agentId", "memoryId"}, Response: Empty, UserScoped: true}
@@ -236,11 +236,11 @@ func DeletePrompt(promptID string) UserScoped {
 	return UserScoped{Request{Op: deletePrompt, Segments: []string{promptID}}}
 }
 
-var deleteProvider = &Operation{ID: "deleteProvider", Method: "DELETE", Path: "/v1/providers/{id}", Params: []string{"id"}, Query: []string{"confirmSnapshotInvalidation"}, Response: Empty, CredentialBearing: true}
+var deleteProvider = &Operation{ID: "deleteProvider", Method: "DELETE", Path: "/v1/providers/{providerId}", Params: []string{"providerId"}, Query: []string{"confirmSnapshotInvalidation"}, Response: Empty, CredentialBearing: true}
 
-// DeleteProvider is DELETE /v1/providers/{id}.
-func DeleteProvider(id string) TenantOnly {
-	return TenantOnly{Request{Op: deleteProvider, Segments: []string{id}}}
+// DeleteProvider is DELETE /v1/providers/{providerId}.
+func DeleteProvider(providerID string) TenantOnly {
+	return TenantOnly{Request{Op: deleteProvider, Segments: []string{providerID}}}
 }
 
 var deleteSession = &Operation{ID: "deleteSession", Method: "DELETE", Path: "/v1/agents/{agentId}/sessions/{sessionId}", Params: []string{"agentId", "sessionId"}, Query: []string{"deleteArtifacts"}, Response: Empty, UserScoped: true}
@@ -285,11 +285,11 @@ func DisableAgent(agentID string) UserScoped {
 	return UserScoped{Request{Op: disableAgent, Segments: []string{agentID}}}
 }
 
-var disableChatConnection = &Operation{ID: "disableChatConnection", Method: "POST", Path: "/v1/chat-connections/{id}/disable", Params: []string{"id"}, Response: JSON, CredentialBearing: true}
+var disableChatConnection = &Operation{ID: "disableChatConnection", Method: "POST", Path: "/v1/chat-connections/{chatConnectionId}/disable", Params: []string{"chatConnectionId"}, Response: JSON, CredentialBearing: true}
 
-// DisableChatConnection is POST /v1/chat-connections/{id}/disable.
-func DisableChatConnection(id string) TenantOnly {
-	return TenantOnly{Request{Op: disableChatConnection, Segments: []string{id}}}
+// DisableChatConnection is POST /v1/chat-connections/{chatConnectionId}/disable.
+func DisableChatConnection(chatConnectionID string) TenantOnly {
+	return TenantOnly{Request{Op: disableChatConnection, Segments: []string{chatConnectionID}}}
 }
 
 var discardMerchantUsageEvent = &Operation{ID: "discardMerchantUsageEvent", Method: "POST", Path: "/v1/merchant-usage-events/{eventId}/discard", Params: []string{"eventId"}, Response: JSON}
@@ -306,11 +306,11 @@ func EnableAgent(agentID string) UserScoped {
 	return UserScoped{Request{Op: enableAgent, Segments: []string{agentID}}}
 }
 
-var enableChatConnection = &Operation{ID: "enableChatConnection", Method: "POST", Path: "/v1/chat-connections/{id}/enable", Params: []string{"id"}, Response: JSON, CredentialBearing: true}
+var enableChatConnection = &Operation{ID: "enableChatConnection", Method: "POST", Path: "/v1/chat-connections/{chatConnectionId}/enable", Params: []string{"chatConnectionId"}, Response: JSON, CredentialBearing: true}
 
-// EnableChatConnection is POST /v1/chat-connections/{id}/enable.
-func EnableChatConnection(id string) TenantOnly {
-	return TenantOnly{Request{Op: enableChatConnection, Segments: []string{id}}}
+// EnableChatConnection is POST /v1/chat-connections/{chatConnectionId}/enable.
+func EnableChatConnection(chatConnectionID string) TenantOnly {
+	return TenantOnly{Request{Op: enableChatConnection, Segments: []string{chatConnectionID}}}
 }
 
 var forkSession = &Operation{ID: "forkSession", Method: "POST", Path: "/v1/agents/{agentId}/sessions/{sessionId}/fork", Params: []string{"agentId", "sessionId"}, Body: JSONBody, Response: JSON, UserScoped: true}
@@ -355,18 +355,18 @@ func GetArtifact(artifactID string) UserScoped {
 	return UserScoped{Request{Op: getArtifact, Segments: []string{artifactID}}}
 }
 
-var getChatConnection = &Operation{ID: "getChatConnection", Method: "GET", Path: "/v1/chat-connections/{id}", Params: []string{"id"}, Response: JSON, CredentialBearing: true}
+var getChatConnection = &Operation{ID: "getChatConnection", Method: "GET", Path: "/v1/chat-connections/{chatConnectionId}", Params: []string{"chatConnectionId"}, Response: JSON, CredentialBearing: true}
 
-// GetChatConnection is GET /v1/chat-connections/{id}.
-func GetChatConnection(id string) TenantOnly {
-	return TenantOnly{Request{Op: getChatConnection, Segments: []string{id}}}
+// GetChatConnection is GET /v1/chat-connections/{chatConnectionId}.
+func GetChatConnection(chatConnectionID string) TenantOnly {
+	return TenantOnly{Request{Op: getChatConnection, Segments: []string{chatConnectionID}}}
 }
 
-var getMcpConnection = &Operation{ID: "getMcpConnection", Method: "GET", Path: "/v1/mcp-connections/{id}", Params: []string{"id"}, Response: JSON, CredentialBearing: true}
+var getMcpConnection = &Operation{ID: "getMcpConnection", Method: "GET", Path: "/v1/mcp-connections/{mcpConnectionId}", Params: []string{"mcpConnectionId"}, Response: JSON, CredentialBearing: true}
 
-// GetMCPConnection is GET /v1/mcp-connections/{id}.
-func GetMCPConnection(id string) TenantOnly {
-	return TenantOnly{Request{Op: getMcpConnection, Segments: []string{id}}}
+// GetMCPConnection is GET /v1/mcp-connections/{mcpConnectionId}.
+func GetMCPConnection(mcpConnectionID string) TenantOnly {
+	return TenantOnly{Request{Op: getMcpConnection, Segments: []string{mcpConnectionID}}}
 }
 
 var getMemory = &Operation{ID: "getMemory", Method: "GET", Path: "/v1/agents/{agentId}/memories/{memoryId}", Params: []string{"agentId", "memoryId"}, Response: JSON, UserScoped: true}
@@ -404,11 +404,11 @@ func GetPrompt(promptID string) UserScoped {
 	return UserScoped{Request{Op: getPrompt, Segments: []string{promptID}}}
 }
 
-var getProvider = &Operation{ID: "getProvider", Method: "GET", Path: "/v1/providers/{id}", Params: []string{"id"}, Response: JSON, CredentialBearing: true}
+var getProvider = &Operation{ID: "getProvider", Method: "GET", Path: "/v1/providers/{providerId}", Params: []string{"providerId"}, Response: JSON, CredentialBearing: true}
 
-// GetProvider is GET /v1/providers/{id}.
-func GetProvider(id string) TenantOnly {
-	return TenantOnly{Request{Op: getProvider, Segments: []string{id}}}
+// GetProvider is GET /v1/providers/{providerId}.
+func GetProvider(providerID string) TenantOnly {
+	return TenantOnly{Request{Op: getProvider, Segments: []string{providerID}}}
 }
 
 var getSession = &Operation{ID: "getSession", Method: "GET", Path: "/v1/agents/{agentId}/sessions/{sessionId}", Params: []string{"agentId", "sessionId"}, Response: JSON, UserScoped: true}
@@ -502,7 +502,7 @@ func ListAgents() UserScoped {
 	return UserScoped{Request{Op: listAgents}}
 }
 
-var listArtifacts = &Operation{ID: "listArtifacts", Method: "GET", Path: "/v1/artifacts", Query: []string{"agentId", "sessionId", "cursor"}, Response: JSON, UserScoped: true}
+var listArtifacts = &Operation{ID: "listArtifacts", Method: "GET", Path: "/v1/artifacts", Query: []string{"agentId", "sessionId", "cursor", "limit"}, Response: JSON, UserScoped: true}
 
 // ListArtifacts is GET /v1/artifacts.
 func ListArtifacts() UserScoped {
@@ -558,11 +558,11 @@ func ListPrompts() UserScoped {
 	return UserScoped{Request{Op: listPrompts}}
 }
 
-var listProviderModels = &Operation{ID: "listProviderModels", Method: "GET", Path: "/v1/providers/{id}/models", Params: []string{"id"}, Response: JSON, CredentialBearing: true}
+var listProviderModels = &Operation{ID: "listProviderModels", Method: "GET", Path: "/v1/providers/{providerId}/models", Params: []string{"providerId"}, Response: JSON, CredentialBearing: true}
 
-// ListProviderModels is GET /v1/providers/{id}/models.
-func ListProviderModels(id string) TenantOnly {
-	return TenantOnly{Request{Op: listProviderModels, Segments: []string{id}}}
+// ListProviderModels is GET /v1/providers/{providerId}/models.
+func ListProviderModels(providerID string) TenantOnly {
+	return TenantOnly{Request{Op: listProviderModels, Segments: []string{providerID}}}
 }
 
 var listProviders = &Operation{ID: "listProviders", Method: "GET", Path: "/v1/providers", Response: JSON, CredentialBearing: true}
@@ -621,11 +621,11 @@ func ListTasks() UserScoped {
 	return UserScoped{Request{Op: listTasks}}
 }
 
-var listThinkingLevels = &Operation{ID: "listThinkingLevels", Method: "GET", Path: "/v1/providers/{id}/thinking-levels", Params: []string{"id"}, Query: []string{"model"}, Response: JSON, CredentialBearing: true}
+var listThinkingLevels = &Operation{ID: "listThinkingLevels", Method: "GET", Path: "/v1/providers/{providerId}/thinking-levels", Params: []string{"providerId"}, Query: []string{"model"}, Response: JSON, CredentialBearing: true}
 
-// ListThinkingLevels is GET /v1/providers/{id}/thinking-levels.
-func ListThinkingLevels(id string) TenantOnly {
-	return TenantOnly{Request{Op: listThinkingLevels, Segments: []string{id}}}
+// ListThinkingLevels is GET /v1/providers/{providerId}/thinking-levels.
+func ListThinkingLevels(providerID string) TenantOnly {
+	return TenantOnly{Request{Op: listThinkingLevels, Segments: []string{providerID}}}
 }
 
 var listToolApprovals = &Operation{ID: "listToolApprovals", Method: "GET", Path: "/v1/agents/{agentId}/sessions/{sessionId}/tool-approvals", Params: []string{"agentId", "sessionId"}, Response: JSON, UserScoped: true}
@@ -649,18 +649,18 @@ func PutSkillFile(agentID, skillID string) UserScoped {
 	return UserScoped{Request{Op: putSkillFile, Segments: []string{agentID, skillID}}}
 }
 
-var reconnectMcpConnection = &Operation{ID: "reconnectMcpConnection", Method: "POST", Path: "/v1/mcp-connections/{id}/reconnect", Params: []string{"id"}, Body: JSONBody, Response: JSON, CredentialBearing: true}
+var reconnectMcpConnection = &Operation{ID: "reconnectMcpConnection", Method: "POST", Path: "/v1/mcp-connections/{mcpConnectionId}/reconnect", Params: []string{"mcpConnectionId"}, Body: JSONBody, Response: JSON, CredentialBearing: true}
 
-// ReconnectMCPConnection is POST /v1/mcp-connections/{id}/reconnect.
-func ReconnectMCPConnection(id string) TenantOnly {
-	return TenantOnly{Request{Op: reconnectMcpConnection, Segments: []string{id}}}
+// ReconnectMCPConnection is POST /v1/mcp-connections/{mcpConnectionId}/reconnect.
+func ReconnectMCPConnection(mcpConnectionID string) TenantOnly {
+	return TenantOnly{Request{Op: reconnectMcpConnection, Segments: []string{mcpConnectionID}}}
 }
 
-var renameChatConnection = &Operation{ID: "renameChatConnection", Method: "PATCH", Path: "/v1/chat-connections/{id}", Params: []string{"id"}, Body: JSONBody, Response: JSON, CredentialBearing: true}
+var renameChatConnection = &Operation{ID: "renameChatConnection", Method: "PATCH", Path: "/v1/chat-connections/{chatConnectionId}", Params: []string{"chatConnectionId"}, Body: JSONBody, Response: JSON, CredentialBearing: true}
 
-// RenameChatConnection is PATCH /v1/chat-connections/{id}.
-func RenameChatConnection(id string) TenantOnly {
-	return TenantOnly{Request{Op: renameChatConnection, Segments: []string{id}}}
+// RenameChatConnection is PATCH /v1/chat-connections/{chatConnectionId}.
+func RenameChatConnection(chatConnectionID string) TenantOnly {
+	return TenantOnly{Request{Op: renameChatConnection, Segments: []string{chatConnectionID}}}
 }
 
 var resolveChatFunctionCall = &Operation{ID: "resolveChatFunctionCall", Method: "POST", Path: "/v1/agents/{agentId}/sessions/{sessionId}/function-calls/{functionCallId}/result", Params: []string{"agentId", "sessionId", "functionCallId"}, Body: JSONBody, Response: JSON, UserScoped: true}
@@ -691,11 +691,11 @@ func RetryMerchantUsageEvent(eventID string) TenantOnly {
 	return TenantOnly{Request{Op: retryMerchantUsageEvent, Segments: []string{eventID}}}
 }
 
-var rotateChatCredentials = &Operation{ID: "rotateChatCredentials", Method: "POST", Path: "/v1/chat-connections/{id}/credentials", Params: []string{"id"}, Body: JSONBody, Response: JSON, CredentialBearing: true}
+var rotateChatCredentials = &Operation{ID: "rotateChatCredentials", Method: "POST", Path: "/v1/chat-connections/{chatConnectionId}/credentials", Params: []string{"chatConnectionId"}, Body: JSONBody, Response: JSON, CredentialBearing: true}
 
-// RotateChatCredentials is POST /v1/chat-connections/{id}/credentials.
-func RotateChatCredentials(id string) TenantOnly {
-	return TenantOnly{Request{Op: rotateChatCredentials, Segments: []string{id}}}
+// RotateChatCredentials is POST /v1/chat-connections/{chatConnectionId}/credentials.
+func RotateChatCredentials(chatConnectionID string) TenantOnly {
+	return TenantOnly{Request{Op: rotateChatCredentials, Segments: []string{chatConnectionID}}}
 }
 
 var setMerchantBinding = &Operation{ID: "setMerchantBinding", Method: "PUT", Path: "/v1/merchant-connection/bindings/{userId}", Params: []string{"userId"}, Body: JSONBody, Response: JSON}
@@ -719,16 +719,16 @@ func SubmitSessionInput(agentID, sessionID string) UserScoped {
 	return UserScoped{Request{Op: submitSessionInput, Segments: []string{agentID, sessionID}}}
 }
 
-var testMcpConnection = &Operation{ID: "testMcpConnection", Method: "POST", Path: "/v1/mcp-connections/{id}/test", Params: []string{"id"}, Response: JSON, CredentialBearing: true}
+var testMcpConnection = &Operation{ID: "testMcpConnection", Method: "POST", Path: "/v1/mcp-connections/{mcpConnectionId}/test", Params: []string{"mcpConnectionId"}, Response: JSON, CredentialBearing: true}
 
-// TestMCPConnection is POST /v1/mcp-connections/{id}/test.
-func TestMCPConnection(id string) TenantOnly {
-	return TenantOnly{Request{Op: testMcpConnection, Segments: []string{id}}}
+// TestMCPConnection is POST /v1/mcp-connections/{mcpConnectionId}/test.
+func TestMCPConnection(mcpConnectionID string) TenantOnly {
+	return TenantOnly{Request{Op: testMcpConnection, Segments: []string{mcpConnectionID}}}
 }
 
-var updateAgent = &Operation{ID: "updateAgent", Method: "PUT", Path: "/v1/agents/{agentId}", Params: []string{"agentId"}, Body: JSONBody, Response: JSON, UserScoped: true}
+var updateAgent = &Operation{ID: "updateAgent", Method: "PATCH", Path: "/v1/agents/{agentId}", Params: []string{"agentId"}, Body: JSONBody, Response: JSON, UserScoped: true}
 
-// UpdateAgent is PUT /v1/agents/{agentId}.
+// UpdateAgent is PATCH /v1/agents/{agentId}.
 func UpdateAgent(agentID string) UserScoped {
 	return UserScoped{Request{Op: updateAgent, Segments: []string{agentID}}}
 }
@@ -747,11 +747,11 @@ func UpdateAgentSpendingLimit(agentID string) TenantOnly {
 	return TenantOnly{Request{Op: updateAgentSpendingLimit, Segments: []string{agentID}}}
 }
 
-var updateMcpConnection = &Operation{ID: "updateMcpConnection", Method: "PATCH", Path: "/v1/mcp-connections/{id}", Params: []string{"id"}, Body: JSONBody, Response: JSON, CredentialBearing: true}
+var updateMcpConnection = &Operation{ID: "updateMcpConnection", Method: "PATCH", Path: "/v1/mcp-connections/{mcpConnectionId}", Params: []string{"mcpConnectionId"}, Body: JSONBody, Response: JSON, CredentialBearing: true}
 
-// UpdateMCPConnection is PATCH /v1/mcp-connections/{id}.
-func UpdateMCPConnection(id string) TenantOnly {
-	return TenantOnly{Request{Op: updateMcpConnection, Segments: []string{id}}}
+// UpdateMCPConnection is PATCH /v1/mcp-connections/{mcpConnectionId}.
+func UpdateMCPConnection(mcpConnectionID string) TenantOnly {
+	return TenantOnly{Request{Op: updateMcpConnection, Segments: []string{mcpConnectionID}}}
 }
 
 var updateMemory = &Operation{ID: "updateMemory", Method: "PATCH", Path: "/v1/agents/{agentId}/memories/{memoryId}", Params: []string{"agentId", "memoryId"}, Body: JSONBody, Response: JSON, UserScoped: true}
@@ -775,11 +775,11 @@ func UpdatePrompt(promptID string) UserScoped {
 	return UserScoped{Request{Op: updatePrompt, Segments: []string{promptID}}}
 }
 
-var updateProvider = &Operation{ID: "updateProvider", Method: "PATCH", Path: "/v1/providers/{id}", Params: []string{"id"}, Body: JSONBody, Response: JSON, CredentialBearing: true}
+var updateProvider = &Operation{ID: "updateProvider", Method: "PATCH", Path: "/v1/providers/{providerId}", Params: []string{"providerId"}, Body: JSONBody, Response: JSON, CredentialBearing: true}
 
-// UpdateProvider is PATCH /v1/providers/{id}.
-func UpdateProvider(id string) TenantOnly {
-	return TenantOnly{Request{Op: updateProvider, Segments: []string{id}}}
+// UpdateProvider is PATCH /v1/providers/{providerId}.
+func UpdateProvider(providerID string) TenantOnly {
+	return TenantOnly{Request{Op: updateProvider, Segments: []string{providerID}}}
 }
 
 var updateTask = &Operation{ID: "updateTask", Method: "PATCH", Path: "/v1/tasks/{taskId}", Params: []string{"taskId"}, Body: JSONBody, Response: JSON, UserScoped: true}
@@ -803,9 +803,9 @@ func UpdateTenantSpendingLimit() TenantOnly {
 	return TenantOnly{Request{Op: updateTenantSpendingLimit}}
 }
 
-var updateWorkspace = &Operation{ID: "updateWorkspace", Method: "PUT", Path: "/v1/workspaces/{workspaceId}", Params: []string{"workspaceId"}, Body: JSONBody, Response: JSON, UserScoped: true}
+var updateWorkspace = &Operation{ID: "updateWorkspace", Method: "PATCH", Path: "/v1/workspaces/{workspaceId}", Params: []string{"workspaceId"}, Body: JSONBody, Response: JSON, UserScoped: true}
 
-// UpdateWorkspace is PUT /v1/workspaces/{workspaceId}.
+// UpdateWorkspace is PATCH /v1/workspaces/{workspaceId}.
 func UpdateWorkspace(workspaceID string) UserScoped {
 	return UserScoped{Request{Op: updateWorkspace, Segments: []string{workspaceID}}}
 }
@@ -1116,9 +1116,9 @@ var Fields = map[string][]Field{
 		{Name: "path", In: "body", Required: true, Type: "string"},
 	},
 	"createTask": {
+		{Name: "idempotency-key", In: "header", Type: "string"},
 		{Name: "agentId", In: "body", Required: true, Type: "string"},
 		{Name: "enabled", In: "body", Type: "boolean"},
-		{Name: "idempotencyKey", In: "body", Type: "string"},
 		{Name: "metadata", In: "body", Type: "map"},
 		{Name: "name", In: "body", Required: true, Type: "string"},
 		{Name: "prompt", In: "body", Required: true, Type: "string"},
@@ -1127,7 +1127,7 @@ var Fields = map[string][]Field{
 		{Name: "userId", In: "body", Type: "string"},
 	},
 	"createTaskRun": {
-		{Name: "idempotencyKey", In: "body", Type: "string"},
+		{Name: "idempotency-key", In: "header", Type: "string"},
 	},
 	"createWorkspace": {
 		{Name: "metadata", In: "body", Type: "map"},
@@ -1137,7 +1137,7 @@ var Fields = map[string][]Field{
 		{Name: "userId", In: "body", Type: "string"},
 	},
 	"deleteAgent": {
-		{Name: "includeArtifacts", In: "query", Required: true, Type: "bool-string"},
+		{Name: "deleteArtifacts", In: "query", Required: true, Type: "bool-string"},
 	},
 	"deleteAgentAvatar":     nil,
 	"deleteArtifact":        nil,
@@ -1236,6 +1236,7 @@ var Fields = map[string][]Field{
 		{Name: "agentId", In: "query", Type: "string"},
 		{Name: "sessionId", In: "query", Type: "string"},
 		{Name: "cursor", In: "query", Type: "string"},
+		{Name: "limit", In: "query", Type: "integer"},
 	},
 	"listChatConnections": nil,
 	"listLatestSessions": {
@@ -1490,7 +1491,7 @@ type UnionSite struct{ OperationID, Locator, Union string }
 
 var UnionSites = []UnionSite{
 	{"checkChatHealth", "configuration", "ChatConfiguration"},
-	{"copySkill", "[]", "SkillCopyResult"},
+	{"copySkill", "data[]", "SkillCopyResult"},
 	{"createAgent", "approvalInChat.overrides[].tool", "ToolReference"},
 	{"createAgent", "approvalInTasks.overrides[].tool", "ToolReference"},
 	{"createChatConnection", "configuration", "ChatConfiguration"},
@@ -1517,7 +1518,7 @@ var UnionSites = []UnionSite{
 	{"getWorkspace", "networkPolicy", "NetworkPolicy"},
 	{"listAgents", "data[].approvalInChat.overrides[].tool", "ToolReference"},
 	{"listAgents", "data[].approvalInTasks.overrides[].tool", "ToolReference"},
-	{"listChatConnections", "chatConnections[].configuration", "ChatConfiguration"},
+	{"listChatConnections", "data[].configuration", "ChatConfiguration"},
 	{"listTaskRuns", "data[].agentConfig.approvalInChat.overrides[].tool", "ToolReference"},
 	{"listTaskRuns", "data[].agentConfig.approvalInTasks.overrides[].tool", "ToolReference"},
 	{"listTasks", "data[].schedule", "Schedule"},

@@ -63,19 +63,19 @@ func (s *MemoriesService) All(ctx context.Context, agentID AgentID, params ListM
 // Create saves a memory for an agent: createMemory.
 // See https://docs.blazingagents.com/api-reference/rest-api/memories#create-memory.
 func (s *MemoriesService) Create(ctx context.Context, agentID AgentID, params CreateMemoryParams, opts ...RequestOption) (*Memory, error) {
-	return unwrap[Memory]("memory")(s.s.send(ctx, op.CreateMemory(string(agentID)), params, opts))
+	return decode[Memory](s.s.send(ctx, op.CreateMemory(string(agentID)), params, opts))
 }
 
 // Get returns one memory: getMemory.
 // See https://docs.blazingagents.com/api-reference/rest-api/memories#get-memory.
 func (s *MemoriesService) Get(ctx context.Context, agentID AgentID, memoryID MemoryID, opts ...RequestOption) (*Memory, error) {
-	return unwrap[Memory]("memory")(s.s.send(ctx, op.GetMemory(string(agentID), string(memoryID)), nil, opts))
+	return decode[Memory](s.s.send(ctx, op.GetMemory(string(agentID), string(memoryID)), nil, opts))
 }
 
 // Update replaces a memory's text: updateMemory.
 // See https://docs.blazingagents.com/api-reference/rest-api/memories#update-memory.
 func (s *MemoriesService) Update(ctx context.Context, agentID AgentID, memoryID MemoryID, params UpdateMemoryParams, opts ...RequestOption) (*Memory, error) {
-	return unwrap[Memory]("memory")(s.s.send(ctx, op.UpdateMemory(string(agentID), string(memoryID)), params, opts))
+	return decode[Memory](s.s.send(ctx, op.UpdateMemory(string(agentID), string(memoryID)), params, opts))
 }
 
 // Delete deletes a memory: deleteMemory.

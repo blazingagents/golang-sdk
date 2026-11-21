@@ -136,7 +136,7 @@ func TestProviders(t *testing.T) {
 			Name:      "listProviders",
 			Exchanges: []testkit.Exchange{{Op: "listProviders", Path: "/v1/providers", RespBody: testkit.Example("listProviders", 200)}},
 			Call:      func(ctx context.Context, c *ba.Client) (any, error) { return c.Providers.List(ctx) },
-			Example:   providersUnwrap(t, testkit.Example("listProviders", 200), "providers"),
+			Example:   providersUnwrap(t, testkit.Example("listProviders", 200), "data"),
 			Check: func(t *testing.T, got any) {
 				if ps := got.([]ba.ProviderSummary); len(ps) != 1 || ps[0].ProviderType != ba.ProviderTypeOpenRouter || ps[0].Name != "Production OpenRouter" || !ps[0].UpdatedAt.Equal(created) {
 					t.Fatalf("decoded %+v", ps)
@@ -146,7 +146,7 @@ func TestProviders(t *testing.T) {
 		{
 			Name: "listProviders unknown type and fields",
 			Exchanges: []testkit.Exchange{{Op: "listProviders", Path: "/v1/providers",
-				RespBody: `{"providers":[{"id":"` + string(provider) + `","name":"M","providerType":"mistral","region":"eu","createdAt":"2026-07-10T10:00:00Z","updatedAt":"2026-07-10T10:00:00Z"}]}`}},
+				RespBody: `{"data":[{"id":"` + string(provider) + `","name":"M","providerType":"mistral","region":"eu","createdAt":"2026-07-10T10:00:00Z","updatedAt":"2026-07-10T10:00:00Z"}]}`}},
 			Call: func(ctx context.Context, c *ba.Client) (any, error) { return c.Providers.List(ctx) },
 			Check: func(t *testing.T, got any) {
 				if ps := got.([]ba.ProviderSummary); len(ps) != 1 || ps[0].ID != provider || ps[0].ProviderType != ba.ProviderType("mistral") {
@@ -156,7 +156,7 @@ func TestProviders(t *testing.T) {
 		},
 		{
 			Name:      "listProviders empty",
-			Exchanges: []testkit.Exchange{{Op: "listProviders", Path: "/v1/providers", RespBody: `{"providers":[]}`}},
+			Exchanges: []testkit.Exchange{{Op: "listProviders", Path: "/v1/providers", RespBody: `{"data":[]}`}},
 			Call:      func(ctx context.Context, c *ba.Client) (any, error) { return c.Providers.List(ctx) },
 			Check: func(t *testing.T, got any) {
 				if ps := got.([]ba.ProviderSummary); ps == nil || len(ps) != 0 {
@@ -216,7 +216,7 @@ func TestProviders(t *testing.T) {
 			Name:      "listProviderModels",
 			Exchanges: []testkit.Exchange{{Op: "listProviderModels", Path: path + "/models", RespBody: testkit.Example("listProviderModels", 200)}},
 			Call:      func(ctx context.Context, c *ba.Client) (any, error) { return c.Providers.ListModels(ctx, provider) },
-			Example:   providersUnwrap(t, testkit.Example("listProviderModels", 200), "models"),
+			Example:   providersUnwrap(t, testkit.Example("listProviderModels", 200), "data"),
 			Check: func(t *testing.T, got any) {
 				if ms := got.([]ba.ProviderModel); len(ms) != 1 || ms[0].ID != "openai/gpt-6-luna" {
 					t.Fatalf("decoded %+v", ms)
@@ -228,7 +228,7 @@ func TestProviders(t *testing.T) {
 		{
 			Name: "getProvider path segment",
 			Call: func(ctx context.Context, c *ba.Client) (any, error) { return c.Providers.Get(ctx, "..") },
-			Err:  `blazingagents: invalid argument id: ".." is not a valid path segment`,
+			Err:  `blazingagents: invalid argument providerId: ".." is not a valid path segment`,
 		},
 	})
 }
@@ -237,7 +237,7 @@ func TestProvidersDecodeErrors(t *testing.T) {
 	provider := ba.ProviderID(testkit.ID(op.IDPatterns["ProviderID"]))
 	ctx := context.Background()
 	m := testkit.New(t)
-	m.Expect(testkit.Exchange{Op: "listProviders", Path: "/v1/providers", RespBody: `{"providers":{}}`})
+	m.Expect(testkit.Exchange{Op: "listProviders", Path: "/v1/providers", RespBody: `{"data":{}}`})
 	_, err := m.Client().Providers.List(ctx)
 	providersDecodeError(t, err, "listProviders", "blazingagents: listProviders: decode response: json: ")
 	m = testkit.New(t)

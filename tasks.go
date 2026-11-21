@@ -110,7 +110,10 @@ type ListTasksParams struct {
 
 // CreateTaskParams is the body of createTask.
 type CreateTaskParams struct {
-	IdempotencyKey *string            `json:"idempotencyKey,omitzero"`
+	// IdempotencyKey is sent as Idempotency-Key when it is not empty. Retry with the same key
+	// and the same fields to get the task the first request created, with its first run's ID;
+	// a changed request answers 409 idempotency_conflict.
+	IdempotencyKey string             `json:"-" header:"Idempotency-Key,omitzero"`
 	AgentID        AgentID            `json:"agentId"`
 	Name           string             `json:"name"`
 	Prompt         string             `json:"prompt"`
@@ -130,9 +133,11 @@ type UpdateTaskParams struct {
 	Metadata Metadata           `json:"metadata,omitzero"`
 }
 
-// SubmitTaskParams is the body of createTaskRun.
+// SubmitTaskParams is the idempotency key of createTaskRun, which has no body.
 type SubmitTaskParams struct {
-	IdempotencyKey *string `json:"idempotencyKey,omitzero"`
+	// IdempotencyKey is sent as Idempotency-Key when it is not empty. Retry with the same key
+	// to get the run the first request queued; the task remembers it as long as it exists.
+	IdempotencyKey string `json:"-" header:"Idempotency-Key,omitzero"`
 }
 
 // ListTaskRunsParams pages listTaskRuns.

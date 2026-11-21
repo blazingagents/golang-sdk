@@ -33,7 +33,7 @@ var chatConnectionsTenant = http.Header{"Authorization": {"Bearer " + testkit.AP
 func chatConnectionsErr[T any](_ T, err error) error { return err }
 
 // chatConnectionsListed wraps a decoded list in its envelope, to compare it with a response body.
-func chatConnectionsListed(got any) any { return map[string]any{"chatConnections": got} }
+func chatConnectionsListed(got any) any { return map[string]any{"data": got} }
 
 func chatConnectionsCovers(example string) func(*testing.T, any) {
 	return func(t *testing.T, got any) { testkit.CoversExample(t, example, got) }
@@ -92,7 +92,7 @@ func TestChatConnections(t *testing.T) {
 			Call: call, Example: testkit.Example(opID, 200), Check: chatConnectionsCovers(testkit.Example(opID, 200))}
 	}
 	unknownList := testkit.Exchange{Op: "listChatConnections", Path: "/v1/chat-connections",
-		RespBody: `{"chatConnections":[` + example + `,` + withConfig(`{"platform":"discord","guildId":"g"}`) + `]}`}
+		RespBody: `{"data":[` + example + `,` + withConfig(`{"platform":"discord","guildId":"g"}`) + `]}`}
 	slack := ba.SlackCredentials{BotToken: ba.NewSecret("xoxb-1-2"), SigningSecret: ba.NewSecret("0123456789abcdef0123456789abcdef")}
 	telegram := ba.TelegramCredentials{BotToken: ba.NewSecret("123:abc")}
 	testkit.Run(t, []testkit.Case{
@@ -114,7 +114,7 @@ func TestChatConnections(t *testing.T) {
 		},
 		{
 			Name:      "listChatConnections empty",
-			Exchanges: []testkit.Exchange{{Op: "listChatConnections", Path: "/v1/chat-connections", RespBody: `{"chatConnections":[]}`}},
+			Exchanges: []testkit.Exchange{{Op: "listChatConnections", Path: "/v1/chat-connections", RespBody: `{"data":[]}`}},
 			Call:      func(ctx context.Context, c *ba.Client) (any, error) { return c.ChatConnections.List(ctx) },
 			Check: func(t *testing.T, got any) {
 				if l := got.([]ba.ChatConnection); l == nil || len(l) != 0 {

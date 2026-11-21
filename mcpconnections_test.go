@@ -66,7 +66,7 @@ func TestMCPConnectionsSmoke(t *testing.T) {
 	providersRun(t, []testkit.Case{
 		{
 			Name:      "listMcpConnections",
-			Exchanges: []testkit.Exchange{{Op: "listMcpConnections", Path: "/v1/mcp-connections", RespBody: `{"mcpConnections":[` + conn + `]}`}},
+			Exchanges: []testkit.Exchange{{Op: "listMcpConnections", Path: "/v1/mcp-connections", RespBody: `{"data":[` + conn + `]}`}},
 			Call:      func(ctx context.Context, c *ba.Client) (any, error) { return c.MCPConnections.List(ctx) },
 			Example:   `[` + conn + `]`,
 		},
@@ -74,7 +74,7 @@ func TestMCPConnectionsSmoke(t *testing.T) {
 			Name:      "listMcpConnections example",
 			Exchanges: []testkit.Exchange{{Op: "listMcpConnections", Path: "/v1/mcp-connections", RespBody: testkit.Example("listMcpConnections", 200)}},
 			Call:      func(ctx context.Context, c *ba.Client) (any, error) { return c.MCPConnections.List(ctx) },
-			Example:   providersUnwrap(t, testkit.Example("listMcpConnections", 200), "mcpConnections"),
+			Example:   providersUnwrap(t, testkit.Example("listMcpConnections", 200), "data"),
 			Check: func(t *testing.T, got any) {
 				cs := got.([]ba.MCPConnection)
 				if len(cs) != 1 || cs[0].AuthType != ba.MCPAuthTypeBearer || cs[0].Status != ba.MCPConnectionStatusConnected || cs[0].URL != "https://mcp.example.com/mcp" ||
@@ -85,7 +85,7 @@ func TestMCPConnectionsSmoke(t *testing.T) {
 		},
 		{
 			Name:      "listMcpConnections unknown enums and fields",
-			Exchanges: []testkit.Exchange{{Op: "listMcpConnections", Path: "/v1/mcp-connections", RespBody: `{"mcpConnections":[` + oauth + `]}`}},
+			Exchanges: []testkit.Exchange{{Op: "listMcpConnections", Path: "/v1/mcp-connections", RespBody: `{"data":[` + oauth + `]}`}},
 			Call:      func(ctx context.Context, c *ba.Client) (any, error) { return c.MCPConnections.List(ctx) },
 			Check: func(t *testing.T, got any) {
 				cs := got.([]ba.MCPConnection)

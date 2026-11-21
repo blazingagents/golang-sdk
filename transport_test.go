@@ -165,7 +165,7 @@ func TestCredentialEcho(t *testing.T) {
 		t.Fatalf("short secret substring: %v", err)
 	}
 	// Not CredentialBearing: the same key is not inspected.
-	m.Expect(testkit.Exchange{Op: "getMemory", Path: "/v1/agents/a/memories/m", RespBody: `{"memory":{"id":"m","apiKey":"x"}}`})
+	m.Expect(testkit.Exchange{Op: "getMemory", Path: "/v1/agents/a/memories/m", RespBody: `{"id":"m","apiKey":"x"}`})
 	if _, err := c.Memories.Get(context.Background(), "a", "m"); err != nil {
 		t.Fatal(err)
 	}

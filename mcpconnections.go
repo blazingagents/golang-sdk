@@ -12,6 +12,7 @@ import (
 // credentials, only their last characters in CredentialFragment.
 type MCPConnection struct {
 	ID                 MCPConnectionID         `json:"id"`
+	TenantID           TenantID                `json:"tenantId"`
 	Name               string                  `json:"name"`
 	URL                string                  `json:"url"`
 	AuthType           MCPAuthType             `json:"authType"`
@@ -141,7 +142,7 @@ func mcpWire(body map[string]any, auth MCPAuth) (any, []string) {
 // List lists the tenant's MCP connections. It sends listMcpConnections:
 // https://docs.blazingagents.com/api-reference/rest-api/mcp-connections#list-mcp-connections
 func (s *MCPConnectionsService) List(ctx context.Context, opts ...RequestOption) ([]MCPConnection, error) {
-	return list[MCPConnection]("mcpConnections")(s.s.send(ctx, op.ListMCPConnections(), nil, opts))
+	return list[MCPConnection](s.s.send(ctx, op.ListMCPConnections(), nil, opts))
 }
 
 // Create adds an MCP connection. For MCPAuthNone and MCPAuthBearer the server checks the
