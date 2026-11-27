@@ -58,6 +58,7 @@ const (
 	ErrorCodeSessionBusy                         ErrorCode = "session_busy"
 	ErrorCodeSessionTurnUnresponsive             ErrorCode = "session_turn_unresponsive"
 	ErrorCodeSessionForkUnavailable              ErrorCode = "session_fork_unavailable"
+	ErrorCodeSessionHistoryTooLarge              ErrorCode = "session_history_too_large"
 	ErrorCodeSessionForkDeleted                  ErrorCode = "session_fork_deleted"
 	ErrorCodeMessageIDConflict                   ErrorCode = "message_id_conflict"
 	ErrorCodeSessionVersionMismatch              ErrorCode = "session_version_mismatch"
