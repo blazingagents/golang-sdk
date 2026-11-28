@@ -57,16 +57,21 @@ func TestUsage(t *testing.T) {
 		{
 			Name: "getUsage grouped by session",
 			Exchanges: []testkit.Exchange{{Op: "getUsage", Path: "/v1/usage", Query: url.Values{"groupBy": {"session"}},
-				RespBody: `{"buckets":[{"day":null,"agentId":"` + string(agent) + `","sessionId":"` + string(session) + `","userId":"","provider":"openrouter","model":"m","inputTokens":1,"outputTokens":2,"requestCount":3,"durationMs":4,"costUsd":0.1}],` +
-					`"totals":{"inputTokens":1,"outputTokens":2,"requestCount":3,"durationMs":4}}`}},
+				RespBody: `{"buckets":[{"day":null,"agentId":"` + string(agent) + `","sessionId":"` + string(session) + `","userId":"","provider":"openrouter","model":"m","inputTokens":1,"outputTokens":2,"requestCount":3,"durationMs":4,"costUsd":0.1,"unpricedTurnCount":2}],` +
+					`"totals":{"inputTokens":1,"outputTokens":2,"requestCount":3,"durationMs":4,"costUsd":0.25,"unpricedTurnCount":2}}`}},
 			Call: func(ctx context.Context, c *ba.Client) (any, error) {
 				return c.Usage.Get(ctx, ba.UsageParams{GroupBy: new(ba.UsageGroupBySession)})
 			},
 			Check: func(t *testing.T, got any) {
-				b := got.(*ba.Usage).Buckets[0]
+				u := got.(*ba.Usage)
+				b := u.Buckets[0]
 				if b.Day != nil || *b.AgentID != agent || *b.SessionID != session || *b.UserID != "" || *b.Provider != "openrouter" || *b.Model != "m" ||
-					b.InputTokens != 1 || b.OutputTokens != 2 || b.RequestCount != 3 || b.Duration != 4*time.Millisecond {
+					b.InputTokens != 1 || b.OutputTokens != 2 || b.RequestCount != 3 || b.Duration != 4*time.Millisecond ||
+					b.CostUSD != 0.1 || b.UnpricedTurnCount != 2 {
 					t.Fatalf("decoded %+v", b)
+				}
+				if u.Totals.CostUSD != 0.25 || u.Totals.UnpricedTurnCount != 2 {
+					t.Fatalf("decoded totals %+v", u.Totals)
 				}
 			},
 		},
