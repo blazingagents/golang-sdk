@@ -14,12 +14,21 @@ type Usage struct {
 	Totals  UsageTotals   `json:"totals"`
 }
 
-// UsageTotals adds up tokens, requests and run time.
+// UsageTotals adds up tokens, requests, run time and model cost.
 type UsageTotals struct {
 	InputTokens  int64         `json:"inputTokens"`
 	OutputTokens int64         `json:"outputTokens"`
 	RequestCount int64         `json:"requestCount"`
 	Duration     time.Duration `json:"-"` // durationMs
+	// CostUSD is the estimated US-dollar model cost of the priced turns: the amount the
+	// provider billed when it reported one, else the model catalogue's price for the token
+	// counts. It excludes platform compute, storage, workspace and network charges. Turns
+	// counted in UnpricedTurnCount add nothing to it.
+	CostUSD float64 `json:"costUsd"`
+	// UnpricedTurnCount is the turns that used tokens but have no model cost, such as a model
+	// the catalogue does not price; CostUSD leaves them out, so a nonzero count means CostUSD
+	// is a lower bound.
+	UnpricedTurnCount int64 `json:"unpricedTurnCount"`
 }
 
 // UsageBucket is the usage of one group. The fields of the grouping are set, and the
@@ -35,6 +44,15 @@ type UsageBucket struct {
 	OutputTokens int64         `json:"outputTokens"`
 	RequestCount int64         `json:"requestCount"`
 	Duration     time.Duration `json:"-"` // durationMs
+	// CostUSD is the estimated US-dollar model cost of the priced turns: the amount the
+	// provider billed when it reported one, else the model catalogue's price for the token
+	// counts. It excludes platform compute, storage, workspace and network charges. Turns
+	// counted in UnpricedTurnCount add nothing to it.
+	CostUSD float64 `json:"costUsd"`
+	// UnpricedTurnCount is the turns that used tokens but have no model cost, such as a model
+	// the catalogue does not price; CostUSD leaves them out, so a nonzero count means CostUSD
+	// is a lower bound.
+	UnpricedTurnCount int64 `json:"unpricedTurnCount"`
 }
 
 // SessionUsage is exact usage per session, in the order of SessionUsageParams.SessionIDs.
