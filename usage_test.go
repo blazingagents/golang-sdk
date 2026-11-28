@@ -18,7 +18,7 @@ func TestUsage(t *testing.T) {
 	session := ba.SessionID(testkit.ID(op.IDPatterns["SessionID"]))
 	agentPath := "/v1/agents/" + string(agent) + "/usage"
 	july := &ba.DateRange{From: ba.Date{Year: 2026, Month: time.July, Day: 1}, To: ba.Date{Year: 2026, Month: time.July, Day: 31}}
-	totals := ba.UsageTotals{InputTokens: 27840, OutputTokens: 9170, RequestCount: 22, Duration: 64050 * time.Millisecond}
+	totals := ba.UsageTotals{InputTokens: 27840, OutputTokens: 9170, RequestCount: 22, Duration: 64050 * time.Millisecond, CostUSD: 0.5, UnpricedTurnCount: 1}
 	get := func(name string, params ba.UsageParams, query url.Values) testkit.Case {
 		return testkit.Case{
 			Name:      "getUsage " + name,
@@ -43,7 +43,7 @@ func TestUsage(t *testing.T) {
 			Example:   testkit.Example("getUsage", 200),
 			Check: func(t *testing.T, got any) {
 				u := got.(*ba.Usage)
-				want := ba.UsageBucket{Day: u.Buckets[0].Day, InputTokens: 18240, OutputTokens: 6120, RequestCount: 14, Duration: 41300 * time.Millisecond}
+				want := ba.UsageBucket{Day: u.Buckets[0].Day, InputTokens: 18240, OutputTokens: 6120, RequestCount: 14, Duration: 41300 * time.Millisecond, CostUSD: 0.3125}
 				if len(u.Buckets) != 2 || u.Buckets[0] != want || u.Buckets[0].Day == nil || *u.Buckets[0].Day != "2026-07-09" || u.Totals != totals {
 					t.Fatalf("decoded %+v", u)
 				}
@@ -97,7 +97,7 @@ func TestUsage(t *testing.T) {
 			Example: testkit.Example("getSessionUsage", 200),
 			Check: func(t *testing.T, got any) {
 				d := got.(*ba.SessionUsage).Data
-				if len(d) != 1 || d[0].SessionID == "" || d[0].Totals != (ba.UsageTotals{InputTokens: 12, OutputTokens: 6, RequestCount: 1, Duration: 450 * time.Millisecond}) {
+				if len(d) != 1 || d[0].SessionID == "" || d[0].Totals != (ba.UsageTotals{InputTokens: 12, OutputTokens: 6, RequestCount: 1, Duration: 450 * time.Millisecond, CostUSD: 0.0004}) {
 					t.Fatalf("decoded %+v", d)
 				}
 			},
